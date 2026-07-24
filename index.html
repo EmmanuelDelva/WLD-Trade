@@ -475,17 +475,25 @@ async function correr(){
     D.v={}; TFS.forEach((tf,i)=>{ D.v[tf]=kl[i].map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],vol:+k[5],tbv:+k[9]})); });
 
     // las TRES series L/S + taker + OI hist (Binance-exclusivo)
+    // period=5m, NO 1h. Medido contra fapi el 2026-07-24: con period=1h la última
+    // barra de takerlongshortRatio llega SIEMPRE con ~94 min de edad, y como la edad
+    // se toma como el MÁXIMO de las cuatro series, el gate de frescura (>90 min)
+    // marcaba la foto como NO VERIFICABLE de forma PERMANENTE. Efecto: 2 de las 4
+    // confluencias de contexto (ballenas y taker) fijadas a false para siempre, más
+    // 1.5 puntos de calidad que nunca podían sumarse — techo real de la nota = 7.0,
+    // o sea scalp (mín 8) era imposible e intraday (mín 7) exigía perfección exacta.
+    // Con period=5m las tres series llegan a ~4.6 min y taker a ~9.6 min.
     const [g,ta,tp,tk,oih] = await Promise.all([
-      get("/futures/data/globalLongShortAccountRatio",{symbol:sym,period:"1h",limit:2}),
-      get("/futures/data/topLongShortAccountRatio",{symbol:sym,period:"1h",limit:1}),
-      get("/futures/data/topLongShortPositionRatio",{symbol:sym,period:"1h",limit:1}),
-      get("/futures/data/takerlongshortRatio",{symbol:sym,period:"1h",limit:1}),
+      get("/futures/data/globalLongShortAccountRatio",{symbol:sym,period:"5m",limit:2}),
+      get("/futures/data/topLongShortAccountRatio",{symbol:sym,period:"5m",limit:1}),
+      get("/futures/data/topLongShortPositionRatio",{symbol:sym,period:"5m",limit:1}),
+      get("/futures/data/takerlongshortRatio",{symbol:sym,period:"5m",limit:1}),
       get("/futures/data/openInterestHist",{symbol:sym,period:"1h",limit:24})
     ]);
     D.ls={g:+g[g.length-1].longShortRatio, ta:+ta[0].longShortRatio, tp:+tp[0].longShortRatio};
     D.taker=+tk[0].buySellRatio;
-    // edad = la PEOR de las series, no la de una sola: la de taker suele llegar
-    // ~60 min mas vieja y el gate de frescura no la estaba protegiendo
+    // edad = la PEOR de las series, no la de una sola: la de taker llega mas vieja
+    // que las otras tres incluso en 5m (~9.6 vs ~4.6 min).
     D.lsEdad=Math.max(...[g[g.length-1],ta[0],tp[0],tk[0]]
       .map(x=>x&&x.timestamp?(Date.now()-x.timestamp)/60000:0));
     if(oih.length>1){ D.oiUsd=+oih[oih.length-1].sumOpenInterestValue;
@@ -558,6 +566,18 @@ function render(D, eq, estilo, E, sym){
   const contra = G ? (G.d==="long"?D.fund:-D.fund) : null;
   const contra8 = contra!==null ? contra*(8/D.ivH) : null;
 
+  // ── alineación multi-TF: se calcula SIEMPRE y se muestra SIEMPRE ──
+  // Antes vivía dentro del bloque "hay setup" y no se renderizaba nunca: alimentaba
+  // 2 de los 10 puntos de calidad sin que se pudiera ver de dónde salían.
+  const tfSig={};
+  for(const t of ["1m","5m","15m","1h","4h","1d"]){
+    const c0=D.v[t]; if(!c0||c0.length<201) continue;
+    const vv=cerradas(c0), cs=vv.map(x=>x.c), e20=ema(cs,20);
+    tfSig[t]= e20 && cs[cs.length-1]>e20 ? 1 : -1;
+  }
+  const sgArr=Object.values(tfSig).filter(x=>x!=null);
+  const netoTF=sgArr.length?sgArr.reduce((a,b)=>a+b,0)/sgArr.length:null;
+
   let H=[];
   // ═══ VEREDICTO ═══
   let bloqueos=[], avisos=[], plan=null, calidad=null, calidadDet=null;
@@ -601,13 +621,7 @@ function render(D, eq, estilo, E, sym){
     // ESTRUCTURALES de cada setup (OB/EMA-50/S-R, volumen del impulso,
     // alineacion HTF), que solo Emmanuel puede verificar en su grafico.
     // Aplicarles el numero del banco era una invencion que bloqueaba siempre.
-    // setups OPORTUNISTAS exigen calidad >=8 (SKILL.md:192)
-    const tfSig={};
-    for(const t of ["1m","5m","15m","1h","4h","1d"]){
-      const c0=D.v[t]; if(!c0||c0.length<201) continue;
-      const vv=cerradas(c0), cs=vv.map(x=>x.c), e20=ema(cs,20);
-      tfSig[t]= e20 && cs[cs.length-1]>e20 ? 1 : -1;
-    }
+    // setups OPORTUNISTAS exigen calidad >=8 (SKILL.md:192). tfSig ya viene calculado arriba.
     const a15c=atr(cerradas(D.v["15m"]||[]));
     const [cal,calDet]=calcularCalidad(G,tfSig,G.d,D.ls,contra8,
       a15c?a15c/D.mark*100:null,ses,conflicto,D.lsEdad);
@@ -638,6 +652,37 @@ function render(D, eq, estilo, E, sym){
     H.push(`<div class="card"><h2>Calidad ${cal.toFixed(1)}/10</h2>${calDet.map(x=>
       `<div class="kv"><span class="k">${x[0]}</span><span class="v ${x[1]<0?'dn':x[1]>0?'up':'nd'}">${x[1]>=0?"+":""}${x[1].toFixed(2)}</span></div>
        <div class="sub" style="text-align:right">${x[2]}</div>`).join("")}</div>`);
+  }
+
+  // ── alineación multi-TF, visible siempre ──
+  if(sgArr.length){
+    const orden=["1m","5m","15m","1h","4h","1d"];
+    const chips=orden.filter(t=>tfSig[t]!=null).map(t=>
+      `<span class="pill ${tfSig[t]>0?'up':'dn'}">${t} ${tfSig[t]>0?"▲":"▼"}</span>`).join(" ");
+    const lado = netoTF>0.3?"alcista":netoTF<-0.3?"bajista":"sin sesgo claro";
+    H.push(`<div class="card"><h2>Alineación multi-TF</h2>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">${chips}</div>
+      ${kv("neto", `<b class="${netoTF>0?'up':netoTF<0?'dn':'nd'}">${netoTF>=0?"+":""}${netoTF.toFixed(2)}</b>`,
+        `${lado} · precio vs EMA20 de cada TF (velas cerradas) · vale 2 de los 10 puntos de calidad`)}
+      ${G?`<div class="sub">tu setup es <b>${G.d.toUpperCase()}</b>: ${
+        (G.d==="long"?netoTF:-netoTF)>0 ? "a favor de la alineación" :
+        "<span class='wa'>en contra de la alineación — por eso este componente no suma</span>"}</div>`:""}</div>`);
+  }
+
+  // ── todos los setups detectados, no solo el ganador ──
+  if(setups.length){
+    const filas=setups.map((s,i)=>{
+      const gan = i===0;
+      const rk=(PRIO_TF[s.tf]||[]).indexOf(s.s);
+      return `<div class="kv"><span class="k">${gan?"<b>▶ ":""}${s.s} ${s.d.toUpperCase()} · ${s.tf}${gan?"</b>":""}</span>
+        <span class="v ${s.d==="long"?"up":"dn"}">${s.core?"CORE":s.extra?"extra":"oport."}</span></div>
+        <div class="sub" style="text-align:right">${rk<0?"fuera de la prioridad de ese TF":`prioridad ${rk+1} en ${s.tf}`}</div>`;
+    }).join("");
+    H.push(`<div class="card"><h2>Setups detectados (${setups.length})</h2>${filas}
+      <div class="sub" style="margin-top:6px">Se opera <b>uno</b>: gana el de mayor prioridad
+      en su TF (banco-setups.md), luego CORE sobre oportunista, luego el TF más cercano a
+      ${tfEnt} que es el de entrada de ${estilo}.${
+      conflicto?" <span class='wa'>Hay setups en direcciones opuestas: eso baja la calidad.</span>":""}</div></div>`);
   }
 
   if(evOn) H.push(`<div class="card" style="border-color:rgba(240,169,46,.4)">
@@ -930,18 +975,19 @@ function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8){
   if(ref.etaH>E.maxH*1.5) p.bloq.push(`ETA a TP2 ~${ref.etaH.toFixed(1)}h excede el horizonte de ${estilo} (${E.maxH}h) — es otro estilo de trade`);
   if(contra8!==null&&contra8>FUND_NO) p.bloq.push(`funding ${contra8.toFixed(4)}% base-8h PROHIBITIVO contra el trade`);
   else if(contra8!==null&&contra8>FUND_OK) p.avisos.push(`funding ${contra8.toFixed(4)}% base-8h ALERTA: no mantener más de 4h`);
+  // salta-TP1 (checklist-pre-trade.md:49-50). El umbral era TP2>=3.0R fijo, heredado
+  // de la redacción "T2 muy holgado (>3R)" del checklist. Emmanuel autorizó bajarlo al
+  // mínimo del estilo (2.0 intraday / 1.3 scalp): si el objetivo al que REALMENTE se
+  // opera cumple el R:R, el trade cumple el R:R. TP1 solo era el peldaño intermedio.
+  const SALTA_TP1_MIN = E.rr;
   if(p.tps[0].rn<E.rr){
-    if(p.tps.length>1&&p.tps[1].rn>=3.0){ const v1=p.tps.shift();
+    if(p.tps.length>1&&p.tps[1].rn>=SALTA_TP1_MIN){ const v1=p.tps.shift();
       p.tps.forEach((t,j)=>t.tag=`TP${j+1}`);
-      p.avisos.push(`salta-TP1: el original daba ${v1.rn.toFixed(2)}R < ${E.rr}; se opera directo a T2 con cierre 60/40`);
-      if(p.tps[0].rn<E.rr) p.bloq.push(`ni saltando TP1 se alcanza el mínimo (${p.tps[0].rn.toFixed(2)}R < ${E.rr})`); }
+      p.avisos.push(`salta-TP1: el original daba ${v1.rn.toFixed(2)}R &lt; ${E.rr}; se opera directo a T2 con cierre 60/40`);
+      if(p.tps[0].rn<E.rr) p.bloq.push(`ni saltando TP1 se alcanza el mínimo (${p.tps[0].rn.toFixed(2)}R &lt; ${E.rr})`); }
     else {
-      // Si TP2 supera el mínimo aunque no llegue al 3R que tu regla exige para
-      // saltarse TP1, decirlo: es una decisión tuya informada, no un muro ciego.
       const t2=p.tps[1];
-      const nota = (t2 && t2.rn>=E.rr)
-        ? ` — pero TP2 da ${t2.rn.toFixed(2)}R, que SÍ supera el mínimo. Tu regla exige TP2≥3R para saltar TP1; si operas directo a T2 con cierre 60/40, el R:R cumple. Decisión tuya.`
-        : "";
+      const nota = t2 ? ` (TP2 tampoco: ${t2.rn.toFixed(2)}R)` : " (no hay TP2)";
       p.bloq.push(`R neto TP1 ${p.tps[0].rn.toFixed(2)} &lt; mínimo ${E.rr} del estilo ${estilo}${nota}`);
     } }
   return p;
