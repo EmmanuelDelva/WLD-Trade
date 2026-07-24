@@ -635,22 +635,29 @@ function render(D, eq, estilo, E, sym){
       degr.push("le falta 1 señal de acompañamiento: bajo el tamaño al 0.75% de la cuenta");
     }
 
-    plan = dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8);
-    bloqueos=plan.bloq; avisos=plan.avisos;
-    if(evBloq) bloqueos.unshift(evBloq);
-    if(liqBloq) bloqueos.unshift(liqBloq);
-    plan.cf=cfPre;
-    // Las confluencias de CONTEXTO (derivados) alimentan la calidad, NO son un
-    // gate duro: el umbral "N confluencias" del banco se refiere a las
-    // ESTRUCTURALES de cada setup (OB/EMA-50/S-R, volumen del impulso,
-    // alineacion HTF), que solo Emmanuel puede verificar en su grafico.
-    // Aplicarles el numero del banco era una invencion que bloqueaba siempre.
-    // setups OPORTUNISTAS exigen calidad >=8 (SKILL.md:192). tfSig ya viene calculado arriba.
+    // La CALIDAD se calcula ANTES de dimensionar, porque el R:R mínimo de scalp
+    // depende de ella: SKILL.md:77 dice "1.3:1 si calidad >= 8/10; 2:1 si calidad
+    // < 8". O sea la skill SI contempla operar scalp por debajo de 8, exigiendo
+    // mas R:R — no es un veto. El codigo lo trataba como minimo duro.
+    // tfSig ya viene calculado arriba.
     const a15c=atr(cerradas(D.v["15m"]||[]));
     const [cal,calDet]=calcularCalidad(G,tfSig,G.d,D.ls,contra8,
       a15c?a15c/D.mark*100:null,ses,conflicto,D.lsEdad);
     calidad=cal; calidadDet=calDet;
     const calMin=Math.max(TC.cal,E.cal);
+    // R:R efectivo (checklist-pre-trade.md:41-44)
+    //   Swing >= 2.5 · Intraday >= 2.0 · Scalp >=8/10 -> 1.3 · Scalp <8/10 -> 2.0
+    const rrEfec = estilo==="scalp" ? (cal>=8 ? 1.3 : 2.0) : E.rr;
+    const E2 = {...E, rr: rrEfec};
+
+    plan = dimensionar(D,G,eq,riesgo,estilo,E2,TC,sym,contra,contra8);
+    bloqueos=plan.bloq; avisos=plan.avisos;
+    if(evBloq) bloqueos.unshift(evBloq);
+    if(liqBloq) bloqueos.unshift(liqBloq);
+    plan.cf=cfPre;
+    if(estilo==="scalp") avisos.push(cal>=8
+      ? `nota ${cal.toFixed(1)} ≥ 8, así que en scalp te basta un R:R de 1.3×`
+      : `nota ${cal.toFixed(1)} &lt; 8, así que en scalp el R:R sube a 2.0× (tu regla, SKILL.md:77)`);
     // La calidad se reporta SIEMPRE. Antes iba condicionada a `!bloqueos.length`,
     // así que cualquier otro bloqueo la escondía y la lista de "qué falta" salía
     // incompleta: parecía que arreglando una cosa se destrabaría el trade.
@@ -661,7 +668,7 @@ function render(D, eq, estilo, E, sym){
     // construccion. Ahora: todo lo que sale de dimensionar() o de los gates de
     // evento/liquidez es DURO (es riesgo real); lo que agrega la nota es BLANDO.
     const duros=[...bloqueos];
-    const blandos=[];
+    const blandos=[...(plan.blandos||[])];
     if(!G.core && cal<8) blandos.push(`es un patrón oportunista, no de los principales: con esos exiges nota 8 y va en ${cal.toFixed(1)}`);
     else if(cal<calMin)
       blandos.push(`la nota del trade es <b>${cal.toFixed(1)} de 10</b> y para ${sym.replace("USDT","")} en ${estilo} necesitas ${calMin}`);
@@ -734,7 +741,7 @@ function render(D, eq, estilo, E, sym){
       ${kv("te sales si llega a", `<b class="dn">${f(p.stop)}</b>`,
         `es ${p.stopPct.toFixed(2)}% del precio — el movimiento típico de una vela de ${G.tf} es ${p.atrPct.toFixed(2)}%`)}`;
     if(p.tps&&p.tps.length){
-      planHtml += p.tps.map(t=>kv(`cobras en ${t.tag}`, `${f(t.px)} <span class="${t.rn>=E.rr?'up':'wa'}">${t.rn.toFixed(2)}×</span>`,
+      planHtml += p.tps.map(t=>kv(`cobras en ${t.tag}`, `${f(t.px)} <span class="${t.rn>=(p.rrMin||E.rr)?'up':'wa'}">${t.rn.toFixed(2)}×</span>`,
         `ganas ${t.rn.toFixed(2)} veces lo que arriesgas · llegaría en ~${t.etaH<1?Math.round(t.etaH*60)+" min":t.etaH.toFixed(1)+" h"}${
           t.set?` · pagas funding ${t.set} vez(ces) en el camino`:""}`)).join("")
         + `<div class="sub" style="margin-top:6px">Los objetivos salen de ${p.fuente}. El número
@@ -743,13 +750,18 @@ function render(D, eq, estilo, E, sym){
       planHtml += `<div class="sub wa">sin objetivos calculados — mira el motivo arriba</div>`;
     }
     if(p.tps&&p.tps.length&&p.riesgoUsd){
-      const t1=p.tps[0];
+      // RRM = el R:R que REALMENTE aplica. En scalp depende de la nota
+      // (SKILL.md:77), y esta tarjeta vive fuera del bloque donde se calculó,
+      // así que el plan lo trae consigo.
+      const t1=p.tps[0], RRM=p.rrMin||E.rr;
       planHtml += cruce(`Si el precio llega a tu stop pierdes <b class="dn">${p.riesgoUsd.toFixed(2)} USDT</b>.
         Si llega al primer objetivo ganas <b class="up">${(p.riesgoUsd*t1.rn).toFixed(2)} USDT</b>.
         O sea: arriesgas 1 para ganar ${t1.rn.toFixed(2)}${
-        t1.rn>=E.rr?`, y tu regla de ${estilo} pide al menos ${E.rr} — cumple.`
-                  :`, pero tu regla de ${estilo} pide al menos ${E.rr}.`}`,
-        t1.rn>=E.rr?"ok":"ojo");
+        t1.rn>=RRM?`, y tu regla de ${estilo} pide al menos ${RRM}× — cumple.`
+                  :`, pero tu regla de ${estilo} pide al menos ${RRM}×. Tu skill dice
+                     advertir y pedir confirmación, no bloquear: el plan es ejecutable
+                     y la decisión es tuya.`}`,
+        t1.rn>=RRM?"ok":"ojo");
     }
     H.push(planHtml+`</div>`);
 
@@ -1002,7 +1014,8 @@ function render(D, eq, estilo, E, sym){
 }
 
 function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8){
-  const p={bloq:[],avisos:[]};
+  // bloq = DUROS (vetan) · blandos = advertencias que solo degradan a MARGINAL
+  const p={bloq:[],avisos:[],blandos:[]};
   const a=G.atr||atr(cerradas(D.v[G.tf]));
   if(!a){ p.bloq.push("sin ATR: no se puede proponer stop"); return p; }
   const dir=G.d, sg=dir==="long"?1:-1, mk=D.mark;
@@ -1161,16 +1174,22 @@ function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8){
   // de la redacción "T2 muy holgado (>3R)" del checklist. Emmanuel autorizó bajarlo al
   // mínimo del estilo (2.0 intraday / 1.3 scalp): si el objetivo al que REALMENTE se
   // opera cumple el R:R, el trade cumple el R:R. TP1 solo era el peldaño intermedio.
+  // El R:R por debajo del mínimo NO veta. SKILL.md:78 es explícito: "Si el setup
+  // propuesto no cumple R:R mínimo del estilo elegido, ADVERTIR Y PEDIR
+  // CONFIRMACIÓN antes del W3". El código lo tenía como bloqueo duro, así que un
+  // trade con la nota suficiente salía NO OPERAR igual. Ahora va a p.blandos:
+  // el veredicto queda MARGINAL, el plan se muestra completo y decide Emmanuel.
+  p.rrMin = E.rr;
   const SALTA_TP1_MIN = E.rr;
   if(p.tps[0].rn<E.rr){
     if(p.tps.length>1&&p.tps[1].rn>=SALTA_TP1_MIN){ const v1=p.tps.shift();
       p.tps.forEach((t,j)=>t.tag=`TP${j+1}`);
       p.avisos.push(`salta-TP1: el original daba ${v1.rn.toFixed(2)}R &lt; ${E.rr}; se opera directo a T2 con cierre 60/40`);
-      if(p.tps[0].rn<E.rr) p.bloq.push(`ni saltando TP1 se alcanza el mínimo (${p.tps[0].rn.toFixed(2)}R &lt; ${E.rr})`); }
+      if(p.tps[0].rn<E.rr) p.blandos.push(`ni saltando TP1 se alcanza el mínimo (${p.tps[0].rn.toFixed(2)}× &lt; ${E.rr}×)`); }
     else {
       const t2=p.tps[1];
       const nota = t2 ? ` — el segundo tampoco alcanza (${t2.rn.toFixed(2)}×)` : " y no hay un segundo objetivo";
-      p.bloq.push(`el primer objetivo solo da <b>${p.tps[0].rn.toFixed(2)}×</b> lo que arriesgas y tu regla de ${estilo} pide ${E.rr}×${nota}`);
+      p.blandos.push(`el primer objetivo solo da <b>${p.tps[0].rn.toFixed(2)}×</b> lo que arriesgas y tu regla de ${estilo} pide ${E.rr}×${nota} — tu skill dice advertir y pedir confirmación, no vetar`);
     } }
   return p;
 }
