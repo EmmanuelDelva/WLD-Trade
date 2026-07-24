@@ -164,6 +164,15 @@ const FUND_OK = 0.03, FUND_NO = 0.08, COLCHON = 0.25;
 // El gate anterior de 20 ticks FIJOS era incompatible con WLD por construccion:
 // su stop minimo de 0.5 ATR son 6.9 ticks. Bloqueaba absolutamente todo.
 const TICKS_MIN = 8, TICK_ATR_MAX = 0.25;
+// ── TOPE DE TAMAÑO (fijado por Emmanuel, 2026-07-24) ──
+// 250 USD de margen como máximo, con hasta 75x.
+// Sustituye la escalera por nocional de protocolo-sizing.md:15-17 (50x hasta
+// 1500 USD de nocional, 25x hasta 3000, 10x por encima), calibrada por slippage
+// de orderbook y que topaba WLD en 25x.
+// NO sustituye levMaxPorStop: ese techo no es preferencia sino física — por
+// encima de él la liquidación cae ANTES que el stop y te sacan sin que el stop
+// llegue a ejecutarse.
+const MARGEN_MAX = 250, LEV_MAX_USR = 75;
 // Evento calendarizado (SKILL.md): sizing -50% en ventana, sin abrir +-30min
 const EVENTOS = {WLD:{n:"unlock WLD 24-jul 11:00 CST (baja de TASA -43%, NO cliff)",
   ini:Date.UTC(2026,6,23,6), fin:Date.UTC(2026,6,26,6), ts:Date.UTC(2026,6,24,17)}};
@@ -277,13 +286,23 @@ function detMR(v,e200,vwap,a){ // Mean-Reversion SOLO en rango (gate de regimen)
 // ── Momentum-NY-Open (banco-setups.md #9) ──
 // Rango pre-NY 00:00-07:59 CST y break con cuerpo > 60% del ATR. En su ventana
 // original (08:00-11:59 CST) es EXACTAMENTE el setup del banco.
-function detMomentumNY(v, a, ahoraCST){
+// CST desde UTC, NUNCA desde la hora local del aparato: Emmanuel opera desde el
+// celular y viaja, así que el dispositivo puede estar en otro huso y el resto de
+// la app (sesionCST) ya calcula así.
+const cstH   = ms => (new Date(ms).getUTCHours()+18)%24;
+const cstDia = ms => new Date(ms-6*3600e3).toISOString().slice(0,10);
+
+function detMomentumNY(v, a, ahora){
   if(!a) return null;
-  const h=ahoraCST.getHours();
+  const h=cstH(ahora.getTime());
   if(h<8||h>=12) return null;
-  const hoy=ahoraCST.toDateString();
-  const pre=v.filter(x=>{ const d=new Date(x.t-6*3600e3); // a CST
-    return d.getHours()<8 && new Date(x.t).toDateString()===hoy; });
+  const hoy=cstDia(ahora.getTime());
+  // BUG QUE ESTO CORRIGE: antes el filtro hacía new Date(x.t-6h).getHours(), que
+  // sobre un aparato ya en CST restaba SEIS HORAS DE MÁS. Resultado: el "rango
+  // pre-NY" se estiraba hasta las 13:59 CST e incluía la propia vela que debía
+  // romperlo, así que u.c>hi y u.c<lo eran imposibles por construcción y el
+  // detector no disparó nunca desde que lo escribí.
+  const pre=v.filter(x=>cstDia(x.t)===hoy && cstH(x.t)<8);
   if(pre.length<8) return null;
   const hi=Math.max(...pre.map(x=>x.h)), lo=Math.min(...pre.map(x=>x.l));
   const u=v[v.length-1], cuerpo=Math.abs(u.c-u.o);
@@ -739,16 +758,40 @@ function render(D, eq, estilo, E, sym){
       ${kv("cuántas monedas", `${p.qty.toLocaleString()} ${base}`,
         `la posición vale ${p.notional.toFixed(2)} USDT, o sea ${(p.notional/eq*100).toFixed(0)}% de tu cuenta`)}
       ${kv("apalancamiento", `<b class="ac">${p.lev}x</b> aislado`,
-        `con tu stop aguantarías hasta ${p.levStop.toFixed(0)}x · Binance te deja ${p.br.maxLev}x · tu regla topa en ${TC.lev}x`)}
-      ${kv("margen que apartas", `${p.margen.toFixed(2)} USDT`, `es lo que se te congela mientras el trade esté abierto`)}
+        `${p.lev>=p.levStop-0.5
+          ? `más no se puede: pasando de ${p.levStop.toFixed(0)}x la liquidación caería ANTES que tu stop`
+          : `tu tope son ${LEV_MAX_USR}x · con este stop aguantarías hasta ${p.levStop.toFixed(0)}x`} · Binance te deja ${p.br.maxLev}x`)}
+      ${kv("margen que apartas", `${p.margen.toFixed(2)} USDT`,
+        `de tu tope de ${MARGEN_MAX} · es lo que se te congela mientras el trade esté abierto`)}
       ${p.liq?kv("te liquidaría en", `${f(p.liq)}`,
         `a ${p.liqPct.toFixed(2)}% de tu entrada — te queda ${p.colchon.toFixed(0)}% de aire después del stop`):""}
       ${p.friPct!=null?kv("costo de entrar y salir", `${p.friPct.toFixed(3)}%`,
         `≈ ${(p.notional*p.friPct/100).toFixed(2)} USDT en comisiones y deslizamiento`):""}
+      ${(()=>{ // ── cuánto dinero se mueve por cada tramo de precio ──
+        const porPct = x => p.notional*x/100;
+        const atrUsd = p.atrPct!=null ? porPct(p.atrPct) : null;
+        const liqAtr = (p.liqPct!=null && p.atrPct) ? p.liqPct/p.atrPct : null;
+        return `<div style="margin-top:10px;padding-top:9px;border-top:1px dashed var(--line)">
+          <div class="sub" style="margin-bottom:5px;letter-spacing:.5px">CUÁNTO SE MUEVE TU DINERO</div>
+          ${kv("si se mueve 0.1%", `${porPct(0.1).toFixed(2)} USDT`)}
+          ${kv("si se mueve 0.5%", `${porPct(0.5).toFixed(2)} USDT`)}
+          ${kv("si se mueve 1%",   `<b>${porPct(1).toFixed(2)} USDT</b>`)}
+          ${atrUsd!=null?kv(`una vela típica de ${G.tf}`, `<b class="ac">${atrUsd.toFixed(2)} USDT</b>`,
+            `esa vela mide ${p.atrPct.toFixed(2)}%`):""}
+          ${kv("cada tick", `${(p.qty*TICK).toFixed(3)} USDT`, `el tick de ${base} es ${TICK}`)}
+          ${liqAtr!=null?kv("aire hasta liquidación", `${p.liqPct.toFixed(2)}%`,
+            `son ${liqAtr.toFixed(1)} velas típicas de ${G.tf} seguidas en tu contra`):""}
+        </div>`; })()}
       ${cruce(`Metes <b>${p.margen.toFixed(2)} USDT</b> de margen para mover
         ${p.notional.toFixed(0)} USDT de ${base}. Pase lo que pase, si respetas el stop lo máximo
         que pierdes son <b class="dn">${p.riesgoUsd.toFixed(2)} USDT</b> — el apalancamiento no
         cambia eso, solo cambia cuánto margen se te congela.
+        ${p.recorte
+          ? `<b class="wa">Este tamaño va recortado por tu tope de ${MARGEN_MAX} USDT de margen</b>:
+             tu riesgo del ${riesgo}% pedía ${p.recorte.margenPedido.toFixed(0)} USDT de margen, así que
+             acabas arriesgando ${p.riesgoUsd.toFixed(2)} en vez de ${p.recorte.riesgoPedido.toFixed(2)}.`
+          : `Tu tope son ${MARGEN_MAX} USDT de margen y aquí solo ocupas ${p.margen.toFixed(0)}: no lo
+             alcanzas porque el que manda es tu riesgo del ${riesgo}% de la cuenta.`}
         ${p.liq?`La liquidación de ${f(p.liq)} es <b>teórica</b> y está lejos: tu stop salta mucho antes.
         Además tu cuenta es Portfolio Margin, así que Binance no liquida esta posición sola sino
         la cuenta completa por su margen global.`:""}`, "")}
@@ -1001,8 +1044,7 @@ function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8){
   for(let i=0;i<3;i++){
     br=bracketDe(sym,notional); if(!br){ p.bloq.push("sin brackets para este símbolo"); return p; }
     const lr=levMaxPorStop(stopPct,br.mmr);
-    const tramo = notional<=1500?50:notional<=3000?25:10;
-    const nl=Math.max(1,Math.floor(Math.min(lr,br.maxLev,TC.lev,tramo)));
+    const nl=Math.max(1,Math.floor(Math.min(lr,br.maxLev,TC.lev,LEV_MAX_USR)));
     if(nl===lev) break; lev=nl;
   }
   p.br=br; p.lev=lev; p.levStop=levMaxPorStop(stopPct,br.mmr);
@@ -1012,12 +1054,43 @@ function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8){
   const notReal=qty*entry;
   if(notReal<MINNOT){ p.bloq.push(`nocional ${notReal.toFixed(2)} < mínimo ${MINNOT} USDT`); return p; }
   p.qty=qty; p.notional=notReal; p.margen=notReal/lev;
-  if(p.margen>0.7*eq){ p.bloq.push(`margen ${(p.margen/eq*100).toFixed(0)}% del equity (tu regla exige dejar ≥30% libre) — reduce tamaño`); return p; }
 
-  const liq=liqPx(entry,qty,lev,br.mmr,br.cum,dir);
-  if(liq){ const dl=Math.abs(entry-liq)/entry;
-    p.liq=liq; p.liqPct=dl*100; p.colchon=(dl-stopPct)/dl*100;
-    if((dl-stopPct)/dl<COLCHON) p.bloq.push(`colchón stop-liquidación ${p.colchon.toFixed(1)}% < ${COLCHON*100}% exigido`); }
+  // Tope duro de 250 USD de margen. Si el tamaño que sale del riesgo pide más,
+  // se recorta la cantidad hasta que el margen quepa. Se avisa, porque el trade
+  // deja de arriesgar el % pedido y pasa a arriesgar menos.
+  if(p.margen>MARGEN_MAX){
+    const qc=q(MARGEN_MAX*lev/entry,STEP);
+    if(qc<=0){ p.bloq.push(`con tu tope de ${MARGEN_MAX} USDT de margen la cantidad redondea a 0`); return p; }
+    const notC=qc*entry;
+    if(notC<MINNOT){ p.bloq.push(`con tu tope de ${MARGEN_MAX} USDT de margen la posición queda en ${notC.toFixed(2)} USDT y Binance exige mínimo ${MINNOT}`); return p; }
+    p.recorte={margenPedido:p.margen, riesgoPedido:p.riesgoUsd};
+    p.qty=qc; p.notional=notC; p.margen=notC/lev; p.riesgoUsd=notC*stopPct;
+  }
+  if(p.margen>0.7*eq){ p.bloq.push(`el margen serían ${(p.margen/eq*100).toFixed(0)}% de tu cuenta y tu regla exige dejar libre al menos el 30%`); return p; }
+
+  // Colchón stop-liquidación verificado contra liqPx() EXACTA, no contra la
+  // aproximación liq≈1/L−mmr de levMaxPorStop: esa aproximación ignora el `cum`
+  // del bracket y sale optimista (a 57x prometía 25.8% y la real daba 24.6%).
+  // Y en vez de vetar, se BAJA el apalancamiento hasta que cumpla: menos leverage
+  // con el mismo nocional solo significa apartar más margen, no un trade peor.
+  {
+    let bajadas=0;
+    while(lev>1 && bajadas<60){
+      const lq=liqPx(entry,p.qty,lev,br.mmr,br.cum,dir);
+      if(!lq) break;
+      const dl=Math.abs(entry-lq)/entry;
+      if((dl-stopPct)/dl>=COLCHON){ p.liq=lq; p.liqPct=dl*100; p.colchon=(dl-stopPct)/dl*100; break; }
+      lev--; bajadas++;
+    }
+    if(bajadas){ p.lev=lev; p.margen=p.notional/lev; p.levBajado=bajadas; }
+    if(p.liq==null){
+      const lq=liqPx(entry,p.qty,lev,br.mmr,br.cum,dir);
+      if(lq){ const dl=Math.abs(entry-lq)/entry;
+        p.liq=lq; p.liqPct=dl*100; p.colchon=(dl-stopPct)/dl*100;
+        if((dl-stopPct)/dl<COLCHON) p.bloq.push(`ni bajando a 1x queda colchón entre tu stop y la liquidación (${p.colchon.toFixed(1)}%, exiges ${COLCHON*100}%)`); }
+    }
+    if(p.margen>MARGEN_MAX) p.avisos.push(`al bajar a ${lev}x para respetar el colchón, el margen sube a ${p.margen.toFixed(0)} USDT y pasa tu tope de ${MARGEN_MAX}`);
+  }
 
   // fricción MEDIDA del libro (x2 de protocolo-sizing paso 7)
   const [slip,cub]=slipLibro(D.libro,notReal,dir);
@@ -1066,8 +1139,22 @@ function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8){
   });
   if(p.tps.length<2){ p.bloq.push("los objetivos colapsan al cuantizar al tick"); return p; }
 
+  // Horizonte: AVISA, no bloquea. Que el objetivo tarde mas de lo que dura el
+  // estilo no hace peligroso al trade — solo lo convierte en otro estilo. Antes
+  // vetaba, y sobre WLD eso mataba practicamente todo el scalp: los TP salen de
+  // estructura y la estructura no se acomoda a un reloj de 30 minutos.
   const ref=p.tps[Math.min(1,p.tps.length-1)];
-  if(ref.etaH>E.maxH*1.5) p.bloq.push(`el segundo objetivo tardaría ~${ref.etaH<1?Math.round(ref.etaH*60)+" min":ref.etaH.toFixed(1)+" h"} en llegar, y ${estilo} es para trades de menos de ${E.maxH<1?E.maxH*60+" min":E.maxH+" h"} — esto es otro tipo de trade`);
+  if(ref.etaH>E.maxH*1.5){
+    const dur = ref.etaH<1 ? Math.round(ref.etaH*60)+" min" : ref.etaH.toFixed(1)+" h";
+    const tope = E.maxH<1 ? E.maxH*60+" min" : E.maxH+" h";
+    // sugerir el estilo al que SI le queda el horizonte
+    const cabeEn = Object.entries(ESTILOS)
+      .filter(([k,v])=>k!==estilo && ref.etaH<=v.maxH*1.5)
+      .map(([k])=>k)[0];
+    p.avisos.push(`el segundo objetivo tardaría ~${dur} y ${estilo} está pensado para menos de ${tope}${
+      cabeEn ? `: esto en realidad es un <b>${cabeEn}</b>, no un ${estilo}. Se puede tomar igual, pero cuenta con tenerlo abierto más tiempo`
+             : `: cuenta con tenerlo abierto bastante más de lo normal`}`);
+  }
   if(contra8!==null&&contra8>FUND_NO) p.bloq.push(`funding ${contra8.toFixed(4)}% base-8h PROHIBITIVO contra el trade`);
   else if(contra8!==null&&contra8>FUND_OK) p.avisos.push(`funding ${contra8.toFixed(4)}% base-8h ALERTA: no mantener más de 4h`);
   // salta-TP1 (checklist-pre-trade.md:49-50). El umbral era TP2>=3.0R fijo, heredado
