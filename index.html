@@ -110,8 +110,13 @@
       <button class="go" id="go">Ver</button></div>
   </div>
 
-  <button class="go" id="cp" style="background:var(--card2);border-color:var(--line);
-    color:var(--tx);margin-bottom:8px;font-weight:600">📋 Copiar para Claude</button>
+  <div class="row">
+    <button class="go" id="cp" style="background:var(--card2);border-color:var(--line);
+      color:var(--tx);font-weight:600">📋 Copiar para Claude</button>
+    <button class="go" id="al" style="background:var(--card2);border-color:var(--line);
+      color:var(--tx);font-weight:600;flex:0 0 42%">🔔 Avisarme</button>
+  </div>
+  <div id="alinfo" class="sub" style="margin:-4px 2px 8px;display:none"></div>
 
   <div id="out"></div>
 
@@ -271,6 +276,12 @@ const f = x => x==null?"—":(Math.abs(x)>=1000?x.toFixed(1):Math.abs(x)>=1?x.to
 const q = (x,p) => p ? Math.round(x/p)*p : x;
 const pct = x => (x>=0?"+":"")+x.toFixed(2)+"%";
 const tfH = t => ({"1m":1/60,"5m":1/12,"15m":.25,"1h":1,"4h":4,"1d":24})[t]||1;
+// minutos -> texto legible ("8 min", "1h 20m", "3.2h")
+const minsTxt = m => { if(m==null||!isFinite(m)) return "—";
+  if(m<1) return "menos de 1 min"; if(m<60) return `${Math.round(m)} min`;
+  const h=Math.floor(m/60), r=Math.round(m%60);
+  return h<6 ? `${h}h${r?" "+r+"m":""}` : `${(m/60).toFixed(1)}h`; };
+let LAST_ETA=null;
 
 function tierDe(base){
   for(const [k,c] of Object.entries(TIERS)) if(c.m.includes(base)) return [k,c];
@@ -544,7 +555,7 @@ function render(D, eq, estilo, E, sym){
        CHoCH+OB, OB-HTF, Three-Drives y Range-HVN son SEMI; Wyckoff es MANUAL:
        requieren que marques la estructura — no se inventan.</div>`}</div>`);
 
-  // ── QUÉ VIGILAR ──
+  // ── QUÉ VIGILAR + CUÁNDO VOLVER ──
   if(!G || bloqueos.length){
     const tf=(G&&G.tf)||tfEnt, cr=D.v[tf]||[];
     if(cr.length>60){
@@ -564,8 +575,38 @@ function render(D, eq, estilo, E, sym){
           <div style="font-size:13px;font-weight:600">${c[1]}</div>
           <div class="sub">se activa · ${c[2]}</div>
           <div class="sub">se descarta · ${c[3]}</div>
-          <div class="sub ac">${(c[0]/mk*100>=0?"+":"")}${(c[0]/mk*100).toFixed(2)}% · ${(Math.abs(c[0])/a).toFixed(1)} ATR · ~${(Math.abs(c[0])/(0.6*a)*tfH(tf)).toFixed(1)}h al ritmo actual</div>
+          <div class="sub ac">${(c[0]/mk*100>=0?"+":"")}${(c[0]/mk*100).toFixed(2)}% · ${(Math.abs(c[0])/a).toFixed(1)} ATR · ~${minsTxt(Math.abs(c[0])/(0.6*a)*tfH(tf)*60)} al ritmo actual</div>
         </div>`).join("")}</div>`);
+
+      // ── CUÁNDO VOLVER: el checkpoint mas cercano que puede CAMBIAR el veredicto ──
+      const ck=[];
+      // 1) cierre de la vela del TF de entrada: los setups confirman al cierre
+      const durMin=tfH(tf)*60, ultima=cr[cr.length-1].t;
+      const faltaVela=Math.max(0, durMin-(Date.now()-ultima)/60000);
+      ck.push([faltaVela, `cierra la vela de ${tf}`, "los setups confirman al cierre, no antes"]);
+      // 2) llegada al nivel mas cercano al ritmo actual
+      if(cands.length){ const d=Math.abs(cands[0][0]);
+        ck.push([d/(0.6*a)*durMin, `el precio alcanza ${f(mk+cands[0][0])}`,
+          cands[0][1].replace(/ →.*/,"")]); }
+      // 3) settlement de funding: cambia el gate direccional
+      if(D.fundNext<180) ck.push([D.fundNext, "settlement de funding",
+        "cambia el costo del horizonte y puede desbloquear/bloquear"]);
+      // 4) bloqueos con reloj propio
+      if(bloqueos.some(b=>b.includes("evento"))&&ev)
+        ck.push([Math.max(0,(ev.ts+1800e3-now.getTime())/60000), "termina la ventana ±30min del evento",
+          "hasta entonces no se abre dirección"]);
+      ck.sort((x,y)=>x[0]-y[0]);
+      const prox=ck[0];
+      H.push(`<div class="card" style="border-color:var(--acc)">
+        <h2>Cuándo volver a revisar</h2>
+        <div style="font-size:17px;font-weight:700" class="ac">~${minsTxt(prox[0])}</div>
+        <div class="sub" style="margin-top:2px">${prox[1]} — ${prox[2]}</div>
+        ${ck.length>1?`<div class="sub" style="margin-top:7px;color:var(--dim2)">después: ${
+          ck.slice(1,3).map(c=>`${minsTxt(c[0])} · ${c[1]}`).join(" · ")}</div>`:""}
+        <div class="sub" style="margin-top:7px">Estimación por velocidad ATR y relojes reales
+          (vela, funding, evento). No es una promesa: si el precio se acelera, llega antes.</div>
+      </div>`);
+      LAST_ETA=prox;
     }
   }
 
@@ -577,6 +618,24 @@ function render(D, eq, estilo, E, sym){
     <div class="sub" style="margin-top:5px;color:var(--dim)">Esos gates los pones tú.</div></div>`);
 
   LAST={D,G,plan,setups,tier,estilo,eq,riesgo,ses,bloq:bloqueos,evOn};
+
+  // ── aviso: solo en TRANSICIÓN a operable, nunca repetido ──
+  const verAhora = !G ? "sin-setup" : (bloqueos.length ? "bloqueado" : "OPERAR");
+  if(ULTIMO_VER && ULTIMO_VER !== verAhora && verAhora === "OPERAR" && plan && plan.qty){
+    avisar(`${SYM} · OPERAR ${G.d.toUpperCase()}`,
+      `${G.s} en ${G.tf} · entrada ${f(plan.entry)} · stop ${f(plan.stop)} · ${plan.lev}x · ` +
+      `TP1 ${f(plan.tps[0].px)} (${plan.tps[0].rn.toFixed(2)}R)`);
+  }
+  // aviso secundario: el precio entró en una zona vigilada aunque aún no confirme
+  if(ULTIMO_VER && G && bloqueos.length && G.z){
+    const dentro = D.mark>=Math.min(...G.z) && D.mark<=Math.max(...G.z);
+    if(dentro && !ZONA_AVISADA){ ZONA_AVISADA=true;
+      avisar(`${SYM} · precio en la zona`,
+        `${G.s} ${G.d.toUpperCase()} en ${G.tf}: el precio entró en ${f(Math.min(...G.z))}–${f(Math.max(...G.z))}. Falta el cierre que confirme.`);
+    } else if(!dentro) ZONA_AVISADA=false;
+  }
+  ULTIMO_VER = verAhora;
+
   $("#out").innerHTML=H.join("");
   $("#clock").textContent=now.toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"})+" · "+ses;
 }
@@ -739,6 +798,49 @@ $("#cp").onclick=async()=>{
   setTimeout(()=>{b.textContent=o; b.style.color=""},2200);
 };
 
+// ───────── avisos: notificación local + pantalla despierta ─────────
+// LIMITE HONESTO: sin servidor, algo tiene que estar despierto vigilando. Esto
+// vigila mientras la PESTAÑA VIVE. En iOS/Android una pestaña en segundo plano
+// se suspende a los pocos minutos: sirve para una sesión activa (dejas el móvil
+// con la app abierta), NO para avisarte dormido. Wake Lock mantiene la pantalla
+// encendida mientras dure la sesión para que el polling no muera.
+let AVISOS=false, WAKE=null, ULTIMO_VER=null, ZONA_AVISADA=false;
+async function toggleAvisos(){
+  const info=$("#alinfo"), b=$("#al");
+  if(AVISOS){ AVISOS=false; if(WAKE){ try{await WAKE.release()}catch(e){} WAKE=null; }
+    b.textContent="🔔 Avisarme"; b.style.color=""; info.style.display="none"; return; }
+  if(!("Notification" in window)){
+    info.style.display="block";
+    info.innerHTML='<span class="wa">Este navegador no soporta notificaciones. En iPhone: añade la app a la pantalla de inicio y ábrela desde ahí.</span>';
+    return; }
+  let perm=Notification.permission;
+  if(perm==="default") perm=await Notification.requestPermission();
+  if(perm!=="granted"){
+    info.style.display="block";
+    info.innerHTML='<span class="wa">Permiso denegado. Actívalo en los ajustes del navegador para este sitio.</span>';
+    return; }
+  AVISOS=true; b.textContent="🔔 Vigilando"; b.style.color="var(--ok)";
+  try{ if("wakeLock" in navigator) WAKE=await navigator.wakeLock.request("screen"); }catch(e){}
+  info.style.display="block";
+  info.innerHTML=`Te aviso en cuanto el veredicto pase a <b>OPERAR</b> o el precio toque una zona vigilada.
+    <span class="wa">Funciona mientras esta pestaña siga viva</span> — si el móvil la suspende, deja de vigilar.
+    ${WAKE?"Pantalla mantenida encendida.":""}`;
+}
+// re-adquirir el wake lock al volver a la pestaña (el SO lo suelta al ocultarla)
+document.addEventListener("visibilitychange", async()=>{
+  if(AVISOS && !document.hidden && "wakeLock" in navigator && !WAKE){
+    try{ WAKE=await navigator.wakeLock.request("screen"); }catch(e){} }
+});
+function avisar(titulo, cuerpo){
+  if(!AVISOS || Notification.permission!=="granted") return;
+  try{ const n=new Notification(titulo,{body:cuerpo, tag:"perp-"+SYM, renotify:true,
+        icon:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>"});
+    n.onclick=()=>{ window.focus(); n.close(); };
+  }catch(e){}
+  try{ navigator.vibrate && navigator.vibrate([220,90,220]); }catch(e){}
+}
+$("#al").onclick=toggleAvisos;
+
 // ───────────────────────────── UI ─────────────────────────────
 const kv=(k,v,s)=>`<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>${s?`<div class="sub" style="text-align:right">${s}</div>`:""}`;
 const vcard=(cls,t,s,li)=>`<div class="verd ${cls}"><div class="t">${t}</div><div class="s">${s}</div>${
@@ -749,18 +851,36 @@ $("#chips").innerHTML=MONEDAS.map(m=>{
   return `<div class="chip ${m===SYM?"on":""} ${t==="T1"?"t1":""}" data-m="${m}">${m}${t==="T1"?" ★":""}</div>`;
 }).join("");
 $("#chips").onclick=e=>{ const c=e.target.closest(".chip"); if(!c) return;
-  SYM=c.dataset.m; TICK=null;
+  SYM=c.dataset.m; TICK=null;              // filtros del nuevo símbolo
+  ULTIMO_VER=null; ZONA_AVISADA=false;     // no arrastrar el estado de avisos
   document.querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===c));
-  correr(); };
-$("#go").onclick=correr;
-$("#st").onchange=correr;
+  tick(true); };
+$("#go").onclick=()=>tick(true);
+$("#st").onchange=()=>tick(true);
 $("#eq").onchange=()=>localStorage.setItem("eq",$("#eq").value);
 if(localStorage.getItem("eq")) $("#eq").value=localStorage.getItem("eq");
 if(localStorage.getItem("st")) $("#st").value=localStorage.getItem("st");
 
-correr();
-// auto-refresh: 45s en scalp, 90s en intraday. Solo con la pestaña visible.
-setInterval(()=>{ if(!document.hidden) correr(); }, 60000);
+// Auto-refresh adaptativo. Un solo temporizador, sin solapes.
+//  · scalp 30s / intraday 75s (el scalp necesita más frecuencia)
+//  · con avisos activos sigue aunque la pestaña esté oculta (mientras el SO la
+//    deje viva); sin avisos solo refresca visible, para no gastarte datos
+//  · ~35 KB por corrida -> scalp ≈ 4 MB/h, intraday ≈ 1.7 MB/h
+let corriendo=false;
+async function tick(forzar){
+  if(corriendo) return;                              // nunca dos corridas a la vez
+  if(!forzar && document.hidden && !AVISOS) return;
+  corriendo=true;
+  try{ await correr(); } catch(e){}
+  finally{ corriendo=false; programar(); }
+}
+let temporizador=null;
+function programar(){
+  clearTimeout(temporizador);
+  const periodo=($("#st").value==="scalp"?30:75)*1000;
+  temporizador=setTimeout(()=>tick(false), periodo);
+}
+tick(true);
 </script>
 </body>
 </html>
