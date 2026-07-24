@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0e13">
+<title>Perp · WLD</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  :root{
+    --bg:#0b0e13; --card:#141922; --card2:#1b2230; --line:#242c3a;
+    --tx:#e8edf5; --dim:#8b97a8; --dim2:#5d6878;
+    --ok:#25c281; --no:#ef4d5a; --warn:#f0a92e; --acc:#5b8cff;
+  }
+  html,body{margin:0;background:var(--bg);color:var(--tx);
+    font:15px/1.45 ui-sans-serif,-apple-system,"SF Pro Text",Segoe UI,Roboto,sans-serif}
+  body{padding:10px 10px calc(30px + env(safe-area-inset-bottom))}
+  .wrap{max-width:640px;margin:0 auto}
+  h1{font-size:15px;margin:0;font-weight:650;letter-spacing:-.2px}
+  .mono{font-variant-numeric:tabular-nums;
+    font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace}
+
+  .top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .top .sp{flex:1}
+  .badge{font-size:10.5px;padding:3px 7px;border-radius:5px;background:var(--card2);
+    color:var(--dim);font-weight:600;letter-spacing:.3px}
+
+  .chips{display:flex;gap:5px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px;
+    scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;padding:7px 11px;border-radius:8px;background:var(--card);
+    border:1px solid var(--line);color:var(--dim);font-size:12.5px;font-weight:600;
+    cursor:pointer;white-space:nowrap}
+  .chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+  .chip.t1{border-color:#3a4a6a}
+
+  .row{display:flex;gap:6px;margin-bottom:8px}
+  .row>*{flex:1}
+  input,select,button{font:inherit;background:var(--card);color:var(--tx);
+    border:1px solid var(--line);border-radius:8px;padding:8px 9px;width:100%}
+  input:focus,select:focus{outline:none;border-color:var(--acc)}
+  label{display:block;font-size:10.5px;color:var(--dim2);margin:0 0 3px 2px;
+    text-transform:uppercase;letter-spacing:.5px;font-weight:650}
+  button.go{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:650;
+    cursor:pointer}
+  button.go:active{opacity:.75}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:11px;
+    padding:11px 12px;margin-bottom:8px}
+  .card h2{font-size:10.5px;color:var(--dim2);margin:0 0 8px;text-transform:uppercase;
+    letter-spacing:.7px;font-weight:700}
+
+  .verd{padding:13px 14px;border-radius:11px;margin-bottom:8px;border:1px solid}
+  .verd.op{background:rgba(37,194,129,.09);border-color:rgba(37,194,129,.4)}
+  .verd.no{background:rgba(239,77,90,.08);border-color:rgba(239,77,90,.33)}
+  .verd.wt{background:rgba(240,169,46,.08);border-color:rgba(240,169,46,.33)}
+  .verd .t{font-size:19px;font-weight:750;letter-spacing:-.3px}
+  .verd .s{font-size:12.5px;color:var(--dim);margin-top:3px}
+  .verd ul{margin:7px 0 0;padding-left:17px}
+  .verd li{font-size:12.5px;margin:3px 0}
+
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:3.5px 0;font-size:13px}
+  .kv .k{color:var(--dim);flex:0 0 auto}
+  .kv .v{text-align:right;font-variant-numeric:tabular-nums}
+  .sub{font-size:11px;color:var(--dim2);margin-top:1px}
+
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{color:var(--dim2);font-weight:650;text-align:right;padding:3px 0;font-size:10px;
+    text-transform:uppercase;letter-spacing:.4px}
+  th:first-child,td:first-child{text-align:left}
+  td{padding:4px 0;text-align:right;font-variant-numeric:tabular-nums;
+    border-top:1px solid var(--line)}
+
+  .up{color:var(--ok)} .dn{color:var(--no)} .nd{color:var(--dim2)}
+  .wa{color:var(--warn)} .ac{color:var(--acc)}
+  .pill{display:inline-block;font-size:10px;padding:1.5px 6px;border-radius:4px;
+    background:var(--card2);color:var(--dim);font-weight:650}
+
+  .err{background:rgba(239,77,90,.1);border:1px solid rgba(239,77,90,.4);
+    border-radius:11px;padding:13px;margin-bottom:8px;font-size:13px}
+  .err b{display:block;margin-bottom:5px;font-size:14px}
+  .foot{color:var(--dim2);font-size:10.5px;text-align:center;margin-top:14px;
+    line-height:1.6}
+  .spin{display:inline-block;width:11px;height:11px;border:2px solid var(--line);
+    border-top-color:var(--acc);border-radius:50%;animation:sp .7s linear infinite;
+    vertical-align:-1px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <h1>Perp <span class="nd" id="hsym">WLD</span></h1>
+    <div class="sp"></div>
+    <span class="badge" id="clock">—</span>
+    <span class="badge" id="venue">BINANCE</span>
+  </div>
+
+  <div class="chips" id="chips"></div>
+
+  <div class="row">
+    <div><label>Equity USDT</label><input id="eq" type="number" inputmode="decimal" value="1500"></div>
+    <div><label>Estilo</label><select id="st">
+      <option value="scalp">Scalp · 5-30m</option>
+      <option value="intraday" selected>Intraday · 30m-4h</option>
+    </select></div>
+    <div style="flex:0 0 74px;display:flex;align-items:flex-end">
+      <button class="go" id="go">Ver</button></div>
+  </div>
+
+  <button class="go" id="cp" style="background:var(--card2);border-color:var(--line);
+    color:var(--tx);margin-bottom:8px;font-weight:600">📋 Copiar para Claude</button>
+
+  <div id="out"></div>
+
+  <div class="foot">
+    Datos directos de Binance USD-M desde <b>este dispositivo</b> — sin servidor intermedio.<br>
+    Indicadores sobre velas cerradas · liquidación teórica (tu cuenta es Portfolio Margin).<br>
+    Asistente estructurado; no asesoría financiera.
+  </div>
+</div>
+
+<script>
+"use strict";
+// ═══════════════════════════════════════════════════════════════════════════
+// Perp WLD — operativa scalp/intraday sin servidor.
+// Las peticiones salen del navegador de ESTE dispositivo: usa tu IP, que
+// Binance nunca ha baneado ni geo-bloqueado. Cero hosting, cero costo.
+// Criterios portados del disparador auditado (3 pases adversariales).
+// ═══════════════════════════════════════════════════════════════════════════
+const API = "https://fapi.binance.com";
+
+// [capNocional, MMR, cum, maxLev] · verificado 2026-07-24 contra el espejo
+// publico de Binance. Sin CORS en ese endpoint -> se embebe. Revisar cada
+// ~3 meses: si Binance cambia brackets, el apalancamiento sugerido cambia.
+const BRACKETS = {"WLDUSDT":[[20000,0.01,0,75],[200000,0.015,100,50],[1000000,0.02,1100,25],[2000000,0.025,6100,20]],"BTCUSDT":[[300000,0.004,0,150],[800000,0.005,300,100],[3000000,0.0065,1500,75],[12000000,0.01,12000,50]],"ETHUSDT":[[300000,0.004,0,150],[800000,0.005,300,100],[3000000,0.0065,1500,75],[12000000,0.01,12000,50]],"SOLUSDT":[[50000,0.005,0,100],[400000,0.0065,75,75],[1000000,0.01,1475,50],[4000000,0.02,11475,25]],"FETUSDT":[[5000,0.01,0,75],[10000,0.015,25,50],[50000,0.02,75,25],[100000,0.025,325,20]],"GMTUSDT":[[5000,0.015,0,50],[10000,0.025,50,20],[20000,0.05,300,10],[50000,0.1,1300,5]],"1000SHIBUSDT":[[25000,0.0065,0,75],[150000,0.01,87.5,50],[200000,0.015,837.5,40],[800000,0.02,1837.5,25]],"1000FLOKIUSDT":[[5000,0.01,0,75],[10000,0.015,25,50],[50000,0.02,75,25],[100000,0.025,325,20]],"GALAUSDT":[[5000,0.01,0,75],[10000,0.015,25,50],[25000,0.02,75,25],[50000,0.025,200,20]]};
+
+// Tiers de la skill: riesgo, calidad minima, tope de lev, confluencias, liquidez
+const TIERS = {
+  T1:{m:["WLD"],              r:1.5, rmax:2.0, cal:7, lev:75, conf:3, core:false, liq:0},
+  T2:{m:["BTC","ETH","SOL","FET"], r:1.0, rmax:1.5, cal:7, lev:25, conf:2, core:false, liq:50e6},
+  T3:{m:["GMT","1000SHIB","1000FLOKI","GALA"], r:0.75, rmax:1.0, cal:8, lev:10, conf:4, core:true, liq:10e6}
+};
+const ESTILOS = {
+  scalp:   {tfs:["15m","5m","1m"], rr:1.3, cal:8, maxH:0.5},
+  intraday:{tfs:["1h","15m","5m"], rr:2.0, cal:7, maxH:4}
+};
+const FUND_OK = 0.03, FUND_NO = 0.08, COLCHON = 0.25, TICKS_MIN = 20;
+// Evento calendarizado (SKILL.md): sizing -50% en ventana, sin abrir +-30min
+const EVENTOS = {WLD:{n:"unlock WLD 24-jul 11:00 CST (baja de TASA -43%, NO cliff)",
+  ini:Date.UTC(2026,6,23,6), fin:Date.UTC(2026,6,26,6), ts:Date.UTC(2026,6,24,17)}};
+const MONEDAS = ["WLD","BTC","ETH","SOL","FET","GMT","1000SHIB","1000FLOKI","GALA"];
+
+const $ = s => document.querySelector(s);
+let SYM = localStorage.getItem("sym") || "WLD";
+let timer = null;
+
+// ───────────────────────────── capa de datos ─────────────────────────────
+// Binance-o-nada: si falla, se dice. Jamas otro exchange, jamas un dato viejo
+// presentado como fresco.
+async function get(path, params) {
+  const qs = params ? "?" + new URLSearchParams(params) : "";
+  const r = await fetch(API + path + qs, {cache:"no-store"});
+  if (!r.ok) {
+    const txt = await r.text().catch(()=> "");
+    throw new Error(`HTTP ${r.status} en ${path}${r.status===418||r.status===429?" (rate-limit)":""} ${txt.slice(0,90)}`);
+  }
+  return r.json();
+}
+
+// ───────────────────────────── indicadores ─────────────────────────────
+// TODO sobre velas CERRADAS. La vela viva solo sirve como precio.
+const cerradas = v => v.length > 1 ? v.slice(0,-1) : v;
+
+function ema(a,n){ if(a.length<n) return null;
+  let k=2/(n+1), e=a.slice(0,n).reduce((x,y)=>x+y,0)/n;
+  for(let i=n;i<a.length;i++) e=a[i]*k+e*(1-k); return e; }
+
+function rsi(c,n=14){ if(c.length<n+1) return null;
+  let g=0,l=0; for(let i=1;i<=n;i++){const d=c[i]-c[i-1]; d>0?g+=d:l-=d;}
+  let ag=g/n, al=l/n;
+  for(let i=n+1;i<c.length;i++){const d=c[i]-c[i-1];
+    ag=(ag*(n-1)+Math.max(d,0))/n; al=(al*(n-1)+Math.max(-d,0))/n;}
+  return al===0?100:100-100/(1+ag/al); }
+
+function atr(v,n=14){ if(v.length<n+1) return null;
+  const t=[]; for(let i=1;i<v.length;i++)
+    t.push(Math.max(v[i].h-v[i].l, Math.abs(v[i].h-v[i-1].c), Math.abs(v[i].l-v[i-1].c)));
+  return t.slice(-n).reduce((x,y)=>x+y,0)/n; }
+
+function swings(v,k=3){ const hi=[],lo=[];
+  for(let i=k;i<v.length-k;i++){ let ah=true,al=true;
+    for(let j=i-k;j<=i+k;j++){ if(j===i)continue;
+      if(v[j].h>v[i].h)ah=false; if(v[j].l<v[i].l)al=false; }
+    if(ah)hi.push([i,v[i].h]); if(al)lo.push([i,v[i].l]); }
+  return [hi,lo]; }
+
+// ───────────────────────────── setups AUTO ─────────────────────────────
+// Solo los 6 detectables desde OHLCV. Los SEMI (CHoCH+OB, OB-HTF, Three-Drives,
+// Range-HVN) y los MANUAL (Wyckoff) NO se inventan: exigen que marques estructura.
+function detFVG(v){
+  for(let i=v.length-3;i>Math.max(v.length-12,1);i--){
+    const a=v[i-1], c=v[i+1], post=v.slice(i+2);
+    if(a.h<c.l){ const w=c.l-a.h;
+      const pen = post.length&&w ? Math.max(0,(c.l-Math.min(...post.map(x=>x.l)))/w) : 0;
+      if(pen<=0.5) return {s:"FVG-entrada",d:"long",core:true,prio:3,z:[a.h,c.l],mit:pen,
+        n:`FVG alcista ${f(a.h)}–${f(c.l)}, ${(pen*100).toFixed(0)}% mitigado`}; }
+    if(a.l>c.h){ const w=a.l-c.h;
+      const pen = post.length&&w ? Math.max(0,(Math.max(...post.map(x=>x.h))-c.h)/w) : 0;
+      if(pen<=0.5) return {s:"FVG-entrada",d:"short",core:true,prio:3,z:[c.h,a.l],mit:pen,
+        n:`FVG bajista ${f(c.h)}–${f(a.l)}, ${(pen*100).toFixed(0)}% mitigado`}; }
+  } return null; }
+
+function detSweep(v){ const [hi,lo]=swings(v.slice(0,-1)); const u=v[v.length-1];
+  if(hi.length){ const n=Math.max(...hi.slice(-4).map(x=>x[1]));
+    if(u.h>n && u.c<n && (u.h-u.c)>0.55*(u.h-u.l))
+      return {s:"Sweep+Reclaim",d:"short",core:true,prio:1,z:[n,u.h],
+        n:`barrió máximo ${f(n)} y cerró dentro`}; }
+  if(lo.length){ const n=Math.min(...lo.slice(-4).map(x=>x[1]));
+    if(u.l<n && u.c>n && (u.c-u.l)>0.55*(u.h-u.l))
+      return {s:"Sweep+Reclaim",d:"long",core:true,prio:1,z:[u.l,n],
+        n:`barrió mínimo ${f(n)} y cerró dentro`}; }
+  return null; }
+
+function detBOS(v,a){ if(!a) return null;
+  const [hi,lo]=swings(v.slice(0,-6)); const rec=v.slice(-6), u=v[v.length-1], tol=0.3*a;
+  if(hi.length){ const n=Math.max(...hi.slice(-3).map(x=>x[1]));
+    if(rec.slice(0,-1).some(x=>x.c>n) && u.l<=n+tol && u.c>n)
+      return {s:"BOS+Retest",d:"long",core:true,prio:2,z:[n-0.25*a,n+tol],
+        n:`BOS alcista sobre ${f(n)}, en retest`}; }
+  if(lo.length){ const n=Math.min(...lo.slice(-3).map(x=>x[1]));
+    if(rec.slice(0,-1).some(x=>x.c<n) && u.h>=n-tol && u.c<n)
+      return {s:"BOS+Retest",d:"short",core:true,prio:2,z:[n-tol,n+0.25*a],
+        n:`BOS bajista bajo ${f(n)}, en retest`}; }
+  return null; }
+
+function detEQ(v){ const [hi,lo]=swings(v.slice(0,-1)); const u=v[v.length-1];
+  for(const [pv,d] of [[hi,"short"],[lo,"long"]]){ if(pv.length<2) continue;
+    const ps=pv.slice(-4).map(x=>x[1]);
+    for(let i=0;i<ps.length-1;i++){ const [a,b]=[ps[i],ps[i+1]];
+      if(Math.abs(a-b)/Math.max(a,b)>=0.001) continue;
+      const n=(a+b)/2;
+      if(d==="short"&&u.h>n&&u.c<n) return {s:"EQH/EQL-Sweep",d,core:false,prio:4,z:[n,u.h],n:`EQH ${f(n)} barrido`};
+      if(d==="long"&&u.l<n&&u.c>n)  return {s:"EQH/EQL-Sweep",d,core:false,prio:4,z:[u.l,n],n:`EQL ${f(n)} barrido`}; } }
+  return null; }
+
+function detMR(v,e200,vwap,a){ // Mean-Reversion SOLO en rango (gate de regimen)
+  const u=v[v.length-1], r=rsi(v.map(x=>x.c)), ref=vwap||e200;
+  if(!ref||r===null||!a) return null;
+  const w=v.slice(-20), anc=Math.max(...w.map(x=>x.h))-Math.min(...w.map(x=>x.l));
+  if(anc>4*a) return null;                      // hay tendencia: no es mean-reversion
+  const dv=(u.c-ref)/ref;
+  if(dv<-0.02&&r<30) return {s:"Mean-Reversion",d:"long",core:false,prio:5,z:[u.l,u.c],
+    n:`${(dv*100).toFixed(2)}% bajo referencia, RSI ${r.toFixed(0)}`};
+  if(dv>0.02&&r>70)  return {s:"Mean-Reversion",d:"short",core:false,prio:5,z:[u.c,u.h],
+    n:`+${(dv*100).toFixed(2)}% sobre referencia, RSI ${r.toFixed(0)}`};
+  return null; }
+
+// prioridad POR TF de entrada (banco-setups.md), no ranking global
+const PRIO_TF = {"1m":["Mean-Reversion","FVG-entrada"],
+  "5m":["Mean-Reversion","FVG-entrada"],
+  "15m":["Sweep+Reclaim","BOS+Retest","FVG-entrada","EQH/EQL-Sweep"],
+  "1h":["BOS+Retest","Sweep+Reclaim","FVG-entrada","EQH/EQL-Sweep"],
+  "4h":["BOS+Retest","Sweep+Reclaim","FVG-entrada"]};
+
+// ───────────────────────────── utilidades ─────────────────────────────
+let TICK=null, STEP=null, MINNOT=5;
+const f = x => x==null?"—":(Math.abs(x)>=1000?x.toFixed(1):Math.abs(x)>=1?x.toFixed(4):x.toPrecision(5));
+const q = (x,p) => p ? Math.round(x/p)*p : x;
+const pct = x => (x>=0?"+":"")+x.toFixed(2)+"%";
+const tfH = t => ({"1m":1/60,"5m":1/12,"15m":.25,"1h":1,"4h":4,"1d":24})[t]||1;
+
+function tierDe(base){
+  for(const [k,c] of Object.entries(TIERS)) if(c.m.includes(base)) return [k,c];
+  return ["T3*", TIERS.T3];                     // fuera de watchlist -> mas conservador
+}
+function bracketDe(sym,not){
+  const bs=BRACKETS[sym]; if(!bs) return null;
+  for(let i=0;i<bs.length;i++) if(not<=bs[i][0])
+    return {seq:i+1,mmr:bs[i][1],cum:bs[i][2],maxLev:bs[i][3]};
+  const l=bs[bs.length-1]; return {seq:bs.length,mmr:l[1],cum:l[2],maxLev:l[3]};
+}
+const levMaxPorStop = (sp,mmr) => 1/(sp/(1-COLCHON)+mmr);
+function liqPx(entry,qty,lev,mmr,cum,dir){
+  const mar=qty*entry/lev;
+  const den = dir==="long" ? qty*(mmr-1) : qty*(mmr+1);
+  if(!den) return null;
+  return dir==="long" ? (mar+cum-qty*entry)/den : (mar+cum+qty*entry)/den;
+}
+function slipLibro(libro,not,dir){
+  const lado = dir==="long"?libro.asks:libro.bids;
+  if(!lado||!lado.length) return [null,false];
+  const ref=+lado[0][0]; let falta=not, u=0;
+  for(const [p,c] of lado){ const px=+p, cn=+c, val=px*cn;
+    if(val>=falta){ u+=falta/px; falta=0; break; }
+    u+=cn; falta-=val; }
+  if(falta>0) return [null,false];
+  return [Math.abs((not/u)/ref-1)*1e4, true];
+}
+const sesionCST = d => { const h=(d.getUTCHours()+18)%24, dow=(d.getUTCDay()+(d.getUTCHours()<6?6:0))%7;
+  if(dow===0||dow===6) return "weekend";
+  if(h>=8&&h<12) return "ny_open"; if(h>=12&&h<16) return "ny_tarde";
+  if(h>=20||h<4) return "asia"; return "transicion"; };
+
+// ───────────────────────────── motor ─────────────────────────────
+async function correr(){
+  const eq=+$("#eq").value||1500, estilo=$("#st").value, E=ESTILOS[estilo];
+  const sym=SYM+"USDT";
+  localStorage.setItem("eq",eq); localStorage.setItem("st",estilo); localStorage.setItem("sym",SYM);
+  $("#hsym").textContent=SYM;
+  $("#out").innerHTML=`<div class="card" style="text-align:center;color:var(--dim)">
+    <span class="spin"></span> consultando Binance…</div>`;
+
+  const TFS=["1m","5m","15m","1h","4h","1d"];
+  let D={};
+  try{
+    // Filtros del simbolo (tick/step/minNotional).
+    // OJO 1: /fapi/v1/exchangeInfo IGNORA el parametro symbol (a diferencia de
+    //   spot) y devuelve los 846 pares. Tomar symbols[0] daba el tick de BTCUSDT
+    //   (0.1) para TODAS las monedas -> precios cuantizados a la rejilla de
+    //   Bitcoin y plan basura. Hay que BUSCAR el simbolo en el array.
+    // OJO 2: son ~1 MB. Se cachean en el dispositivo (cambian una vez al año)
+    //   para no quemarte datos moviles en cada arranque.
+    if(!TICK){
+      const ck=`f:${sym}`, cached=localStorage.getItem(ck);
+      let fl=null;
+      if(cached){ try{ const c=JSON.parse(cached);
+        if(Date.now()-c.ts < 30*86400e3) fl=c.f; }catch(e){} }
+      if(!fl){
+        const xi=await get("/fapi/v1/exchangeInfo");
+        const s=(xi.symbols||[]).find(x=>x.symbol===sym);
+        if(!s) throw new Error(`${sym} no está listado en Binance USD-M`);
+        const m=Object.fromEntries(s.filters.map(x=>[x.filterType,x]));
+        fl={t:+m.PRICE_FILTER.tickSize, s:+m.LOT_SIZE.stepSize,
+            n:+((m.MIN_NOTIONAL||{}).notional||5)};
+        localStorage.setItem(ck, JSON.stringify({ts:Date.now(), f:fl}));
+      }
+      TICK=fl.t; STEP=fl.s; MINNOT=fl.n;
+      if(!(TICK>0)||!(STEP>0)) throw new Error(`filtros inválidos para ${sym}`);
+    }
+    const [pi,oi,t24,depth] = await Promise.all([
+      get("/fapi/v1/premiumIndex",{symbol:sym}),
+      get("/fapi/v1/openInterest",{symbol:sym}),
+      get("/fapi/v1/ticker/24hr",{symbol:sym}),
+      get("/fapi/v1/depth",{symbol:sym,limit:50})
+    ]);
+    D.mark=+pi.markPrice; D.index=+pi.indexPrice;
+    D.fund=+pi.lastFundingRate*100;
+    D.fundNext=(pi.nextFundingTime-Date.now())/60000;
+    D.oi=+oi.openInterest; D.vol=+t24.quoteVolume; D.chg=+t24.priceChangePercent;
+    D.libro=depth; D.bid=+depth.bids[0][0]; D.ask=+depth.asks[0][0];
+
+    const kl = await Promise.all(TFS.map(tf=>get("/fapi/v1/klines",{symbol:sym,interval:tf,limit:210})));
+    D.v={}; TFS.forEach((tf,i)=>{ D.v[tf]=kl[i].map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],vol:+k[5],tbv:+k[9]})); });
+
+    // las TRES series L/S + taker + OI hist (Binance-exclusivo)
+    const [g,ta,tp,tk,oih] = await Promise.all([
+      get("/futures/data/globalLongShortAccountRatio",{symbol:sym,period:"1h",limit:2}),
+      get("/futures/data/topLongShortAccountRatio",{symbol:sym,period:"1h",limit:1}),
+      get("/futures/data/topLongShortPositionRatio",{symbol:sym,period:"1h",limit:1}),
+      get("/futures/data/takerlongshortRatio",{symbol:sym,period:"1h",limit:1}),
+      get("/futures/data/openInterestHist",{symbol:sym,period:"1h",limit:24})
+    ]);
+    D.ls={g:+g[g.length-1].longShortRatio, ta:+ta[0].longShortRatio, tp:+tp[0].longShortRatio};
+    D.lsEdad=(Date.now()-g[g.length-1].timestamp)/60000;
+    D.taker=+tk[0].buySellRatio;
+    if(oih.length>1){ D.oiUsd=+oih[oih.length-1].sumOpenInterestValue;
+      D.oiChg=(+oih[oih.length-1].sumOpenInterest/+oih[0].sumOpenInterest-1)*100; }
+
+    // intervalo REAL de funding (447 de 731 perps no son 8h)
+    D.ivH=8;
+    try{ const fi=await get("/fapi/v1/fundingInfo");
+      const m=fi.find(x=>x.symbol===sym); if(m) D.ivH=+m.fundingIntervalHours||8; }catch(e){}
+  }catch(e){
+    $("#out").innerHTML=`<div class="err"><b>Binance no respondió</b>
+      ${e.message}<br><br>
+      <span class="nd">No se sustituye por otro exchange: sin dato es sin dato.
+      Si es 418/429, tu IP está momentáneamente limitada — espera unos minutos.</span></div>`;
+    return;
+  }
+  render(D, eq, estilo, E, sym);
+}
+
+function render(D, eq, estilo, E, sym){
+  const base=SYM, [tier,TC]=tierDe(base);
+  const now=new Date(), ses=sesionCST(now);
+  let riesgo=TC.r, degr=[];
+
+  if(riesgo>TC.rmax){ degr.push(`riesgo recortado al máximo ${TC.rmax}% del tier`); riesgo=TC.rmax; }
+  if(ses==="weekend"&&riesgo>1.25){ degr.push("weekend: sizing a 1.25%"); riesgo=1.25; }
+  const ev=EVENTOS[base]; let evBloq=null, evOn=null;
+  if(ev && now.getTime()>=ev.ini && now.getTime()<ev.fin){
+    evOn=ev.n;
+    if(riesgo>TC.r*0.5){ degr.push(`ventana de evento: sizing −50% → ${TC.r*0.5}%`); riesgo=TC.r*0.5; }
+    if(Math.abs(now.getTime()-ev.ts)<=1800e3) evBloq=`±30 min del evento: prohibido abrir dirección`;
+  }
+
+  // ── setups sobre velas CERRADAS de los TF del estilo ──
+  let setups=[];
+  for(const tf of E.tfs){
+    const cr=D.v[tf]; if(!cr||cr.length<60) continue;
+    const v=cerradas(cr); if(v.length<60) continue;
+    const cs=v.map(x=>x.c), a=atr(v), e200=ema(cs,200);
+    const vt=v.slice(-30).reduce((s,x)=>s+x.vol,0);
+    const vwap=vt?v.slice(-30).reduce((s,x)=>s+x.c*x.vol,0)/vt:null;
+    for(const d of [detSweep(v),detBOS(v,a),detFVG(v),detEQ(v),detMR(v,e200,vwap,a)])
+      if(d){ d.tf=tf; d.atr=a; setups.push(d); }
+  }
+  if(TC.core) setups=setups.filter(s=>s.core);
+  const tfEnt=E.tfs[1];
+  setups.sort((x,y)=>{
+    const rx=(PRIO_TF[x.tf]||[]).indexOf(x.s), ry=(PRIO_TF[y.tf]||[]).indexOf(y.s);
+    return ((rx<0?40+x.prio:rx)-(ry<0?40+y.prio:ry))
+        || ((x.core?0:1)-(y.core?0:1))
+        || (Math.abs(tfH(x.tf)-tfH(tfEnt))-Math.abs(tfH(y.tf)-tfH(tfEnt)));
+  });
+  const G=setups[0]||null;
+  const conflicto = G && setups.some(s=>s.d!==G.d);
+
+  // ── funding direccional normalizado a base 8h ──
+  const contra = G ? (G.d==="long"?D.fund:-D.fund) : null;
+  const contra8 = contra!==null ? contra*(8/D.ivH) : null;
+
+  let H=[];
+  // ═══ VEREDICTO ═══
+  let bloqueos=[], avisos=[], plan=null;
+
+  if(!G){
+    H.push(vcard("no","NO OPERAR","ausencia de setup — tu checklist punto 3 exige setup del banco"));
+  } else {
+    plan = dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8);
+    bloqueos=plan.bloq; avisos=plan.avisos;
+    if(evBloq) bloqueos.unshift(evBloq);
+    // confluencias de CONTEXTO
+    const cf=[];
+    if(contra8!==null) cf.push([`funding ${contra8>=0?"+":""}${contra8.toFixed(4)}% base-8h`, contra8<=FUND_OK]);
+    const vieja=D.lsEdad>90;
+    if(D.ls.tp&&D.ls.g) cf.push([vieja?`ballenas vs retail — NO VERIFICABLE (${D.lsEdad.toFixed(0)} min)`
+      :`ballenas ${D.ls.tp.toFixed(2)} vs retail ${D.ls.g.toFixed(2)}`,
+      !vieja && (G.d==="long" ? D.ls.tp-D.ls.g>0.15 : D.ls.tp-D.ls.g<-0.15)]);
+    if(D.taker!=null) cf.push([vieja?`flujo agresor — NO VERIFICABLE`:`taker ${D.taker.toFixed(3)}`,
+      !vieja && (G.d==="long"?D.taker>1.05:D.taker<0.95)]);
+    if(D.oiChg!=null) cf.push([`OI ${pct(D.oiChg)} vs precio ${pct(D.chg)}`,
+      D.oiChg>1 && ((G.d==="long"&&D.chg>0)||(G.d==="short"&&D.chg<0))]);
+    plan.cf=cf;
+    const ok=cf.filter(x=>x[1]).length;
+    if(ok < (TC.core?TC.conf:TC.conf-1))
+      bloqueos.push(`solo ${ok} confluencias de contexto (el tier ${tier} exige ${TC.conf})`);
+
+    const veredicto = bloqueos.length ? "NO OPERAR" : "OPERAR";
+    H.push(vcard(bloqueos.length?"no":"op", veredicto,
+      `${G.s} ${G.d.toUpperCase()} en ${G.tf} · ${tier} · ${estilo}`,
+      bloqueos.length?bloqueos:null));
+  }
+
+  if(evOn) H.push(`<div class="card" style="border-color:rgba(240,169,46,.4)">
+    <span class="wa">📅 VENTANA DE EVENTO ACTIVA</span><div class="sub">${evOn}</div></div>`);
+  if(degr.length) H.push(`<div class="card"><span class="wa">⚠ ${degr.join(" · ")}</span></div>`);
+
+  // ── PLAN ──
+  // Cada bloque se guarda por la clave que REALMENTE usa: dimensionar() puede
+  // retornar temprano con 'entry' ya calculado pero sin tps/qty (granularidad,
+  // tope de stop, margen, falta de estructura). Guardar todo con 'entry' hacia
+  // reventar el render antes de imprimir el motivo del bloqueo.
+  if(plan && plan.entry){
+    const p=plan, no=bloqueos.length;
+    let planHtml=`<div class="card">
+      <h2>Plan ${G.d.toUpperCase()} ${no?'· <span class="dn">NO EJECUTAR — referencia</span>':''}</h2>
+      ${kv("entrada", `<b>${f(p.entry)}</b> <span class="pill">${p.tipo}</span>`)}
+      ${kv("stop", `<b class="dn">${f(p.stop)}</b>`, `${p.stopPct.toFixed(3)}% · ${p.ticks.toFixed(0)} ticks · ATR ${p.atrPct.toFixed(2)}%`)}`;
+    if(p.tps&&p.tps.length){
+      planHtml += p.tps.map(t=>kv(t.tag, `${f(t.px)} <span class="${t.rn>=E.rr?'up':'wa'}">${t.rn.toFixed(2)}R</span>`,
+        `${t.rb.toFixed(2)}R bruto · ETA ~${t.etaH.toFixed(1)}h${t.set?` · ${t.set} cobro(s) funding`:""}`)).join("")
+        + `<div class="sub" style="margin-top:6px">TP desde ${p.fuente} · R neto = bruto − fees − slippage − funding</div>`;
+    } else {
+      planHtml += `<div class="sub wa">sin objetivos calculados — ver el bloqueo arriba</div>`;
+    }
+    H.push(planHtml+`</div>`);
+
+    if(p.qty) H.push(`<div class="card"><h2>Tamaño · equity ${eq.toLocaleString()} · riesgo ${riesgo}%</h2>
+      ${kv("riesgo", `${p.riesgoUsd.toFixed(2)} USDT`)}
+      ${kv("cantidad", `${p.qty.toLocaleString()} ${base}`, `nocional ${p.notional.toFixed(2)} USDT (${(p.notional/eq*100).toFixed(0)}% del equity)`)}
+      ${kv("apalancamiento", `<b class="ac">${p.lev}x</b> aislado`,
+        `máx por tu stop ${p.levStop.toFixed(1)}x · bracket ${p.br.seq} permite ${p.br.maxLev}x · tier ${tier} topa ${TC.lev}x`)}
+      ${kv("margen", `${p.margen.toFixed(2)} USDT`)}
+      ${kv("MMR real", `${(p.br.mmr*100).toFixed(3)}%`, `bracket ${p.br.seq}, cum ${p.br.cum}`)}
+      ${p.liq?kv("liquidación", `${f(p.liq)}`, `${p.liqPct.toFixed(3)}% de la entrada · colchón ${p.colchon.toFixed(1)}% <span class="wa">— TEÓRICA (aislado). Tu cuenta es PM: liquida por uniMMR a nivel de CUENTA</span>`):""}
+      ${p.friPct!=null?kv("fricción", `${p.friPct.toFixed(3)}%`, `slippage medido del libro ${p.slip.toFixed(2)} bps`):""}
+    </div>`);
+
+    if(p.cf&&p.cf.length) H.push(`<div class="card"><h2>Confluencias de contexto</h2>
+      ${p.cf.map(c=>`<div class="kv"><span class="k">${c[1]?'<span class="up">✓</span>':'<span class="nd">✗</span>'} ${c[0]}</span></div>`).join("")}</div>`);
+    if(avisos.length) H.push(`<div class="card">${avisos.map(a=>`<div class="wa" style="font-size:12.5px">⚠ ${a}</div>`).join("")}</div>`);
+  }
+
+  // ── MERCADO ──
+  const fTier = contra8===null?"":(Math.abs(contra8)<=FUND_OK?"up":Math.abs(contra8)<=FUND_NO?"wa":"dn");
+  H.push(`<div class="card"><h2>Mercado</h2>
+    ${kv("mark", `<b>${f(D.mark)}</b>`, `index ${f(D.index)} · basis ${((D.mark/D.index-1)*1e4).toFixed(2)} bps · spread ${((D.ask/D.bid-1)*1e4).toFixed(2)} bps`)}
+    ${kv("24h", `<span class="${D.chg>=0?'up':'dn'}">${pct(D.chg)}</span>`, `volumen ${(D.vol/1e6).toFixed(1)}M USD`)}
+    ${kv("funding", `<span class="${fTier}">${D.fund>=0?"+":""}${D.fund.toFixed(4)}%</span> / ${D.ivH}h`,
+      `= ${(D.fund*8/D.ivH>=0?"+":"")}${(D.fund*8/D.ivH).toFixed(4)}% base-8h · próximo en ${D.fundNext.toFixed(0)} min`)}
+    ${kv("open interest", `${(D.oi/1e6).toFixed(1)}M ${base}`, D.oiUsd?`${(D.oiUsd/1e6).toFixed(1)}M USD · ${pct(D.oiChg)} 24h`:"")}
+  </div>`);
+
+  // ── POSICIONAMIENTO ──
+  const vieja=D.lsEdad>90, sp=D.ls.tp-D.ls.g;
+  H.push(`<div class="card"><h2>Posicionamiento · 3 series Binance</h2>
+    ${kv("retail (global)", D.ls.g.toFixed(4), `largos ${(D.ls.g/(1+D.ls.g)*100).toFixed(1)}% / cortos ${(100-D.ls.g/(1+D.ls.g)*100).toFixed(1)}%`)}
+    ${kv("top por CUENTA", D.ls.ta.toFixed(4))}
+    ${kv("top por POSICIÓN", `<b class="ac">${D.ls.tp.toFixed(4)}</b>`, "smart money")}
+    ${kv("spread ballenas−retail", `<span class="${sp>0?'up':'dn'}">${sp>=0?"+":""}${sp.toFixed(4)}</span>`,
+      sp>0?"ballenas más largas que retail":"ballenas más cortas que retail")}
+    ${kv("flujo agresor (taker)", D.taker.toFixed(4), D.taker>1?"compradores presionando":"vendedores presionando")}
+    ${kv("edad de estas series", `<span class="${vieja?'wa':'nd'}">${D.lsEdad.toFixed(0)} min</span>`,
+      `buckets de 1h${vieja?" — >90 min: NO cuentan como confluencia":""}`)}
+  </div>`);
+
+  // ── MULTI-TF ──
+  let rows="";
+  for(const tf of ["1m","5m","15m","1h","4h","1d"]){
+    const cr=D.v[tf]; if(!cr||cr.length<31){ rows+=`<tr><td>${tf}</td><td colspan="5" class="nd">sin historia</td></tr>`; continue; }
+    const v=cerradas(cr), cs=v.map(x=>x.c), a=atr(v), e20=ema(cs,20), e200=ema(cs,200);
+    const px=cs[cs.length-1], u=v[v.length-1], r=rsi(cs);
+    const dl=u.vol?((2*u.tbv-u.vol)/u.vol*100):null;
+    const tri=(e)=>e==null?'<span class="nd">s/d</span>':(px>e?'<span class="up">+</span>':'<span class="dn">−</span>');
+    rows+=`<tr><td>${tf}</td><td>${r==null?'<span class="nd">s/d</span>':r.toFixed(1)}</td>
+      <td>${a?(a/px*100).toFixed(2):'<span class="nd">s/d</span>'}</td>
+      <td>${tri(e20)}</td><td>${tri(e200)}</td>
+      <td class="${dl>0?'up':'dn'}">${dl==null?'—':dl.toFixed(0)+'%'}</td></tr>`;
+  }
+  H.push(`<div class="card"><h2>Estructura multi-TF · velas cerradas</h2>
+    <table><thead><tr><th>TF</th><th>RSI</th><th>ATR%</th><th>EMA20</th><th>EMA200</th><th>Δ vela</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`);
+
+  // ── SETUPS ──
+  H.push(`<div class="card"><h2>Setups automáticos</h2>${
+    setups.length ? setups.map(s=>`<div class="kv"><span class="k">${s===G?'<span class="ac">▶</span>':'&nbsp;&nbsp;'}
+      <span class="pill">${s.tf}</span> ${s.s}</span><span class="v ${s.d==='long'?'up':'dn'}">${s.d.toUpperCase()}</span></div>
+      <div class="sub" style="margin-left:20px">${s.n}</div>`).join("")
+    : `<div class="nd" style="font-size:12.5px">ninguno de los detectables automáticamente.<br>
+       CHoCH+OB, OB-HTF, Three-Drives y Range-HVN son SEMI; Wyckoff es MANUAL:
+       requieren que marques la estructura — no se inventan.</div>`}</div>`);
+
+  // ── QUÉ VIGILAR ──
+  if(!G || bloqueos.length){
+    const tf=(G&&G.tf)||tfEnt, cr=D.v[tf]||[];
+    if(cr.length>60){
+      const v=cerradas(cr), a=atr(v), mk=D.mark, [hi,lo]=swings(v);
+      const cands=[];
+      const nh=hi.length?Math.max(...hi.slice(-4).map(x=>x[1])):null;
+      const nl=lo.length?Math.min(...lo.slice(-4).map(x=>x[1])):null;
+      if(nh&&nh>mk) cands.push([nh-mk,`Sweep del máximo ${f(nh)} → SHORT`,
+        `mecha más allá de ${f(nh)} y cierre de ${tf} de vuelta dentro`,
+        `cierre limpio sobre ${f(nh)} = ruptura genuina, no barrido`]);
+      if(nl&&nl<mk) cands.push([nl-mk,`Sweep del mínimo ${f(nl)} → LONG`,
+        `mecha más allá de ${f(nl)} y cierre de ${tf} de vuelta dentro`,
+        `cierre limpio bajo ${f(nl)} = ruptura genuina, no barrido`]);
+      cands.sort((x,y)=>Math.abs(x[0])-Math.abs(y[0]));
+      if(cands.length) H.push(`<div class="card"><h2>Qué vigilar</h2>${
+        cands.slice(0,2).map(c=>`<div style="margin-bottom:9px">
+          <div style="font-size:13px;font-weight:600">${c[1]}</div>
+          <div class="sub">se activa · ${c[2]}</div>
+          <div class="sub">se descarta · ${c[3]}</div>
+          <div class="sub ac">${(c[0]/mk*100>=0?"+":"")}${(c[0]/mk*100).toFixed(2)}% · ${(Math.abs(c[0])/a).toFixed(1)} ATR · ~${(Math.abs(c[0])/(0.6*a)*tfH(tf)).toFixed(1)}h al ritmo actual</div>
+        </div>`).join("")}</div>`);
+    }
+  }
+
+  H.push(`<div class="card"><h2>Lo que esto NO sabe</h2>
+    <div class="sub">· pérdidas de hoy/semana (2 seguidas → 0.75%; 4 o −6R → stop al día)</div>
+    <div class="sub">· si existe plan W1 y si este par está en la watchlist de hoy</div>
+    <div class="sub">· posiciones abiertas correlacionadas (tope agregado 3%)</div>
+    <div class="sub">· tu estado mental — puntos 8, 9 y 10 del checklist</div>
+    <div class="sub" style="margin-top:5px;color:var(--dim)">Esos gates los pones tú.</div></div>`);
+
+  LAST={D,G,plan,setups,tier,estilo,eq,riesgo,ses,bloq:bloqueos,evOn};
+  $("#out").innerHTML=H.join("");
+  $("#clock").textContent=now.toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"})+" · "+ses;
+}
+
+function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8){
+  const p={bloq:[],avisos:[]};
+  const a=G.atr||atr(cerradas(D.v[G.tf]));
+  if(!a){ p.bloq.push("sin ATR: no se puede proponer stop"); return p; }
+  const dir=G.d, sg=dir==="long"?1:-1, mk=D.mark;
+
+  // entrada: limit en zona para setups de zona, mercado para los de confirmación
+  const aMercado=["Sweep+Reclaim","Mean-Reversion"].includes(G.s);
+  let entry, tipo;
+  if(aMercado||!G.z){ entry=q(mk,TICK); tipo="mercado"; }
+  else{ entry=q(dir==="long"?Math.max(...G.z):Math.min(...G.z),TICK); tipo="limit en zona";
+    const reb = dir==="long" ? mk<Math.min(...G.z) : mk>Math.max(...G.z);
+    if(reb){ p.bloq.push(`setup caducado: el precio ya rebasó la zona en contra`); return p; }
+    if(Math.abs(entry-mk)/a>3){ p.bloq.push(`la zona está a ${(Math.abs(entry-mk)/a).toFixed(1)} ATR: no es un trade de ahora`); return p; } }
+
+  let base = G.z ? (dir==="long"?Math.min(...G.z):Math.max(...G.z)) : (dir==="long"?entry-a:entry+a);
+  let stop = q(dir==="long"?base-0.35*a:base+0.35*a, TICK);
+  if((dir==="long"&&stop>=entry)||(dir==="short"&&stop<=entry)){
+    p.bloq.push("el stop quedaría del lado equivocado"); return p; }
+  // stop mínimo 0.5 ATR: más ceñido está DENTRO del ruido e infla el R
+  if(Math.abs(entry-stop)<0.5*a){
+    stop=q(dir==="long"?entry-0.5*a:entry+0.5*a,TICK);
+    p.avisos.push("stop ensanchado a 0.5 ATR: el original estaba dentro del ruido"); }
+
+  const stopPct=Math.abs(entry-stop)/entry, rU=Math.abs(entry-stop);
+  const ticks=rU/TICK;
+  p.entry=entry; p.stop=stop; p.stopPct=stopPct*100; p.atrPct=a/mk*100; p.ticks=ticks; p.tipo=tipo;
+  if(ticks<TICKS_MIN){ p.bloq.push(`granularidad insuficiente: stop de ${ticks.toFixed(0)} ticks (mínimo ${TICKS_MIN}) — el R:R sería ficción`); return p; }
+  const topeStop={scalp:0.015,intraday:0.04}[estilo];
+  if(stopPct>topeStop){ p.bloq.push(`stop ${(stopPct*100).toFixed(2)}% supera el tope de ${topeStop*100}% para ${estilo}`); return p; }
+
+  const riesgoUsd=eq*riesgo/100; let notional=riesgoUsd/stopPct;
+  p.riesgoUsd=riesgoUsd;
+
+  // apalancamiento: 4 techos, gana el MENOR
+  let br=null, lev=null;
+  for(let i=0;i<3;i++){
+    br=bracketDe(sym,notional); if(!br){ p.bloq.push("sin brackets para este símbolo"); return p; }
+    const lr=levMaxPorStop(stopPct,br.mmr);
+    const tramo = notional<=1500?50:notional<=3000?25:10;
+    const nl=Math.max(1,Math.floor(Math.min(lr,br.maxLev,TC.lev,tramo)));
+    if(nl===lev) break; lev=nl;
+  }
+  p.br=br; p.lev=lev; p.levStop=levMaxPorStop(stopPct,br.mmr);
+
+  const qty=q(notional/entry,STEP);
+  if(qty<=0){ p.bloq.push(`cantidad redondea a 0 (step ${STEP})`); return p; }
+  const notReal=qty*entry;
+  if(notReal<MINNOT){ p.bloq.push(`nocional ${notReal.toFixed(2)} < mínimo ${MINNOT} USDT`); return p; }
+  p.qty=qty; p.notional=notReal; p.margen=notReal/lev;
+  if(p.margen>0.7*eq){ p.bloq.push(`margen ${(p.margen/eq*100).toFixed(0)}% del equity (tu regla exige dejar ≥30% libre) — reduce tamaño`); return p; }
+
+  const liq=liqPx(entry,qty,lev,br.mmr,br.cum,dir);
+  if(liq){ const dl=Math.abs(entry-liq)/entry;
+    p.liq=liq; p.liqPct=dl*100; p.colchon=(dl-stopPct)/dl*100;
+    if((dl-stopPct)/dl<COLCHON) p.bloq.push(`colchón stop-liquidación ${p.colchon.toFixed(1)}% < ${COLCHON*100}% exigido`); }
+
+  // fricción MEDIDA del libro (x2 de protocolo-sizing paso 7)
+  const [slip,cub]=slipLibro(D.libro,notReal,dir);
+  if(!cub){ p.bloq.push(`los 50 niveles del libro no cubren ${notReal.toFixed(0)} USDT: no operable a este tamaño`); return p; }
+  const feesPct = tipo==="limit en zona"?0.07:0.10;
+  const friPct=feesPct+slip/100*(tipo==="limit en zona"?1:2);
+  const friUsd=notReal*friPct/100*2;
+  p.slip=slip; p.friPct=friPct;
+
+  // TPs desde ESTRUCTURA con tope 8·ATR
+  const v=cerradas(D.v[G.tf]); const [hi,lo]=swings(v);
+  const TOPE=8*a, sep=Math.max(0.5*rU,0.5*a);
+  let objs=[...new Set((dir==="long"?hi:lo).map(x=>x[1])
+    .filter(x=>(x-entry)*sg>rU*0.5 && Math.abs(x-entry)<=TOPE))]
+    .sort((x,y)=>dir==="long"?x-y:y-x)
+    .reduce((acc,x)=>{ if(!acc.length||Math.abs(x-acc[acc.length-1])>=sep) acc.push(x); return acc; },[]);
+  let fuente=`estructura ${G.tf}`;
+  if(objs.length<2){
+    const esc=["1m","5m","15m","1h","4h","1d"], i=esc.indexOf(G.tf);
+    const sup=esc[i+1];
+    if(sup&&D.v[sup]&&D.v[sup].length>40){
+      const vs=cerradas(D.v[sup]), as=atr(vs), [h2,l2]=swings(vs);
+      const sp2=Math.max(0.5*rU,0.5*(as||a));
+      const o2=[...new Set((dir==="long"?h2:l2).map(x=>x[1])
+        .filter(x=>(x-entry)*sg>rU*0.5 && Math.abs(x-entry)<=TOPE))]
+        .sort((x,y)=>dir==="long"?x-y:y-x)
+        .reduce((acc,x)=>{ if(!acc.length||Math.abs(x-acc[acc.length-1])>=sp2) acc.push(x); return acc; },[]);
+      if(o2.length>=2){ objs=o2; fuente=`estructura ${sup} (el ${G.tf} no tenía)`; } } }
+  if(objs.length<2){ p.bloq.push("sin estructura por delante dentro de 8 ATR para fijar TP — no se inventan objetivos"); return p; }
+  p.fuente=fuente;
+
+  p.tps=[];
+  objs.slice(0,3).forEach((o,i)=>{
+    const px=q(o,TICK); if(px<=0||px===entry) return;
+    const dist=Math.abs(px-entry), rb=dist/rU;
+    const etaH=dist/(0.6*a)*tfH(G.tf);
+    let set=0, cf=0;
+    if(contra!=null){ let rest=D.fundNext/60;
+      while(rest<=etaH && set<24){ set++; rest+=D.ivH; }
+      cf=notReal*(contra/100)*set; }
+    const rn=rb-(friUsd+Math.max(0,cf))/riesgoUsd;
+    p.tps.push({tag:`TP${p.tps.length+1}`,px,rb,rn,etaH,set});
+  });
+  if(p.tps.length<2){ p.bloq.push("los objetivos colapsan al cuantizar al tick"); return p; }
+
+  const ref=p.tps[Math.min(1,p.tps.length-1)];
+  if(ref.etaH>E.maxH*1.5) p.bloq.push(`ETA a TP2 ~${ref.etaH.toFixed(1)}h excede el horizonte de ${estilo} (${E.maxH}h) — es otro estilo de trade`);
+  if(contra8!==null&&contra8>FUND_NO) p.bloq.push(`funding ${contra8.toFixed(4)}% base-8h PROHIBITIVO contra el trade`);
+  else if(contra8!==null&&contra8>FUND_OK) p.avisos.push(`funding ${contra8.toFixed(4)}% base-8h ALERTA: no mantener más de 4h`);
+  if(p.tps[0].rn<E.rr){
+    if(p.tps.length>1&&p.tps[1].rn>=3.0){ const v1=p.tps.shift();
+      p.tps.forEach((t,j)=>t.tag=`TP${j+1}`);
+      p.avisos.push(`salta-TP1: el original daba ${v1.rn.toFixed(2)}R < ${E.rr}; se opera directo a T2 con cierre 60/40`);
+      if(p.tps[0].rn<E.rr) p.bloq.push(`ni saltando TP1 se alcanza el mínimo (${p.tps[0].rn.toFixed(2)}R < ${E.rr})`); }
+    else p.bloq.push(`R neto TP1 ${p.tps[0].rn.toFixed(2)} < mínimo ${E.rr} del estilo ${estilo}`); }
+  return p;
+}
+
+// ───────── copiar para Claude: el estado VERIFICADO, compacto ─────────
+// La pagina trae los DATOS (de tu IP, sin intermediarios). Claude pone el
+// JUICIO: lectura de estructura, si vale saltarse un gate, coaching. Pegar
+// esto le da lo mismo que ve el disparador local, desde donde estes.
+let LAST=null;
+function textoParaClaude(){
+  if(!LAST) return "aún sin datos — pulsa Ver primero";
+  const {D,G,plan,tier,estilo,eq,riesgo,ses,bloq,evOn}=LAST;
+  const L=[];
+  L.push(`[PERP ${SYM} · ${new Date().toLocaleString("es-MX")} · ${ses} · ${tier} · ${estilo} · equity ${eq} · riesgo ${riesgo}%]`);
+  if(evOn) L.push(`EVENTO ACTIVO: ${evOn}`);
+  L.push(`MERCADO mark ${f(D.mark)} · 24h ${pct(D.chg)} · vol ${(D.vol/1e6).toFixed(1)}M · basis ${((D.mark/D.index-1)*1e4).toFixed(1)}bps · spread ${((D.ask/D.bid-1)*1e4).toFixed(1)}bps`);
+  L.push(`FUNDING ${D.fund>=0?"+":""}${D.fund.toFixed(4)}%/${D.ivH}h = ${(D.fund*8/D.ivH>=0?"+":"")}${(D.fund*8/D.ivH).toFixed(4)}% base-8h · próximo en ${D.fundNext.toFixed(0)}min`);
+  L.push(`OI ${(D.oi/1e6).toFixed(1)}M${D.oiUsd?` (${(D.oiUsd/1e6).toFixed(1)}M USD, ${pct(D.oiChg)} 24h)`:""}`);
+  L.push(`L/S retail ${D.ls.g.toFixed(4)} · topCUENTA ${D.ls.ta.toFixed(4)} · topPOSICIÓN ${D.ls.tp.toFixed(4)} · spread ${(D.ls.tp-D.ls.g>=0?"+":"")}${(D.ls.tp-D.ls.g).toFixed(4)} · taker ${D.taker.toFixed(3)} · edad ${D.lsEdad.toFixed(0)}min${D.lsEdad>90?" (VIEJA >90min, no cuenta)":""}`);
+  const tf=[];
+  for(const t of ["1m","5m","15m","1h","4h","1d"]){
+    const cr=D.v[t]; if(!cr||cr.length<31) continue;
+    const v=cerradas(cr), cs=v.map(x=>x.c), a=atr(v), e20=ema(cs,20), e200=ema(cs,200), px=cs[cs.length-1];
+    tf.push(`${t}:RSI${(rsi(cs)||0).toFixed(0)}/ATR${a?(a/px*100).toFixed(2):"?"}%/${e20&&px>e20?"+":"−"}EMA20/${e200?(px>e200?"+":"−"):"?"}EMA200`);
+  }
+  L.push(`MULTI-TF (velas cerradas) ${tf.join(" · ")}`);
+  L.push(`SETUPS AUTO: ${LAST.setups.length?LAST.setups.map(s=>`${s.s} ${s.d.toUpperCase()} en ${s.tf} (${s.n})`).join(" | "):"ninguno detectable — SEMI/MANUAL requieren marcar estructura"}`);
+  if(plan&&plan.entry){
+    L.push(`PLAN ${G.d.toUpperCase()} entrada ${f(plan.entry)} [${plan.tipo}] · stop ${f(plan.stop)} (${plan.stopPct.toFixed(3)}%, ${plan.ticks.toFixed(0)} ticks)`);
+    if(plan.tps&&plan.tps.length) L.push(`TP ${plan.tps.map(t=>`${t.tag} ${f(t.px)} ${t.rn.toFixed(2)}R neto (${t.rb.toFixed(2)} bruto, ETA ${t.etaH.toFixed(1)}h)`).join(" · ")} [${plan.fuente}]`);
+    if(plan.qty) L.push(`SIZING ${plan.qty} ${SYM} · nocional ${plan.notional.toFixed(0)} · ${plan.lev}x (máx por stop ${plan.levStop.toFixed(1)}x, bracket ${plan.br.seq} MMR ${(plan.br.mmr*100).toFixed(3)}%) · margen ${plan.margen.toFixed(0)} · liq teórica ${plan.liq?f(plan.liq):"?"} colchón ${plan.colchon?plan.colchon.toFixed(1):"?"}% · fricción ${plan.friPct?plan.friPct.toFixed(3):"?"}%`);
+    if(plan.cf) L.push(`CONFLUENCIAS ${plan.cf.map(c=>`${c[1]?"✓":"✗"} ${c[0]}`).join(" · ")}`);
+    if(plan.avisos&&plan.avisos.length) L.push(`AVISOS ${plan.avisos.join(" · ")}`);
+  }
+  L.push(`VEREDICTO ${bloq.length?"NO OPERAR":"OPERAR"}${bloq.length?": "+bloq.join(" | "):""}`);
+  L.push(`\n(datos directos de Binance USD-M desde mi dispositivo, sin intermediarios)`);
+  return L.join("\n");
+}
+$("#cp").onclick=async()=>{
+  const t=textoParaClaude();
+  try{ await navigator.clipboard.writeText(t); }
+  catch(e){ const ta=document.createElement("textarea"); ta.value=t; document.body.appendChild(ta);
+    ta.select(); document.execCommand("copy"); ta.remove(); }
+  const b=$("#cp"), o=b.textContent;
+  b.textContent="✓ copiado — pégalo a Claude"; b.style.color="var(--ok)";
+  setTimeout(()=>{b.textContent=o; b.style.color=""},2200);
+};
+
+// ───────────────────────────── UI ─────────────────────────────
+const kv=(k,v,s)=>`<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>${s?`<div class="sub" style="text-align:right">${s}</div>`:""}`;
+const vcard=(cls,t,s,li)=>`<div class="verd ${cls}"><div class="t">${t}</div><div class="s">${s}</div>${
+  li?`<ul>${li.map(x=>`<li>${x}</li>`).join("")}</ul>`:""}</div>`;
+
+$("#chips").innerHTML=MONEDAS.map(m=>{
+  const [t]=tierDe(m);
+  return `<div class="chip ${m===SYM?"on":""} ${t==="T1"?"t1":""}" data-m="${m}">${m}${t==="T1"?" ★":""}</div>`;
+}).join("");
+$("#chips").onclick=e=>{ const c=e.target.closest(".chip"); if(!c) return;
+  SYM=c.dataset.m; TICK=null;
+  document.querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===c));
+  correr(); };
+$("#go").onclick=correr;
+$("#st").onchange=correr;
+$("#eq").onchange=()=>localStorage.setItem("eq",$("#eq").value);
+if(localStorage.getItem("eq")) $("#eq").value=localStorage.getItem("eq");
+if(localStorage.getItem("st")) $("#st").value=localStorage.getItem("st");
+
+correr();
+// auto-refresh: 45s en scalp, 90s en intraday. Solo con la pestaña visible.
+setInterval(()=>{ if(!document.hidden) correr(); }, 60000);
+</script>
+</body>
+</html>
