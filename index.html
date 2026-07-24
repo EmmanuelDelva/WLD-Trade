@@ -152,7 +152,13 @@ const ESTILOS = {
   scalp:   {tfs:["15m","5m","1m"], rr:1.3, cal:8, maxH:0.5},
   intraday:{tfs:["1h","15m","5m"], rr:2.0, cal:7, maxH:4}
 };
-const FUND_OK = 0.03, FUND_NO = 0.08, COLCHON = 0.25, TICKS_MIN = 20;
+const FUND_OK = 0.03, FUND_NO = 0.08, COLCHON = 0.25;
+// Granularidad: el tick no debe pasar del 25% del ATR del TF (si lo pasa, el
+// simbolo no puede expresar un stop con precision) y el stop debe medir al menos
+// 8 ticks (error de cuantizacion ±6% de R, aceptable).
+// El gate anterior de 20 ticks FIJOS era incompatible con WLD por construccion:
+// su stop minimo de 0.5 ATR son 6.9 ticks. Bloqueaba absolutamente todo.
+const TICKS_MIN = 8, TICK_ATR_MAX = 0.25;
 // Evento calendarizado (SKILL.md): sizing -50% en ventana, sin abrir +-30min
 const EVENTOS = {WLD:{n:"unlock WLD 24-jul 11:00 CST (baja de TASA -43%, NO cliff)",
   ini:Date.UTC(2026,6,23,6), fin:Date.UTC(2026,6,26,6), ts:Date.UTC(2026,6,24,17)}};
@@ -263,6 +269,54 @@ function detMR(v,e200,vwap,a){ // Mean-Reversion SOLO en rango (gate de regimen)
     n:`+${(dv*100).toFixed(2)}% sobre referencia, RSI ${r.toFixed(0)}`};
   return null; }
 
+// ── Momentum-NY-Open (banco-setups.md #9) ──
+// Rango pre-NY 00:00-07:59 CST y break con cuerpo > 60% del ATR. En su ventana
+// original (08:00-11:59 CST) es EXACTAMENTE el setup del banco.
+function detMomentumNY(v, a, ahoraCST){
+  if(!a) return null;
+  const h=ahoraCST.getHours();
+  if(h<8||h>=12) return null;
+  const hoy=ahoraCST.toDateString();
+  const pre=v.filter(x=>{ const d=new Date(x.t-6*3600e3); // a CST
+    return d.getHours()<8 && new Date(x.t).toDateString()===hoy; });
+  if(pre.length<8) return null;
+  const hi=Math.max(...pre.map(x=>x.h)), lo=Math.min(...pre.map(x=>x.l));
+  const u=v[v.length-1], cuerpo=Math.abs(u.c-u.o);
+  if(cuerpo<0.6*a) return null;
+  if(u.c>hi) return {s:"Momentum-NY-Open",d:"long",core:false,prio:4,z:[hi*0.999,hi*1.002],
+    n:`break del rango pre-NY ${f(lo)}–${f(hi)} con cuerpo ${(cuerpo/a).toFixed(1)} ATR`};
+  if(u.c<lo) return {s:"Momentum-NY-Open",d:"short",core:false,prio:4,z:[lo*0.998,lo*1.001],
+    n:`break bajista del rango pre-NY ${f(lo)}–${f(hi)} con cuerpo ${(cuerpo/a).toFixed(1)} ATR`};
+  return null;
+}
+
+// ── Impulso + Pullback (continuación de tendencia) ──
+// NO está en el banco de 12 como tal: es la generalización de "BOS+Retest" cuando
+// el retest llega a la EMA20 en vez de al nivel roto. Se marca EXTRA para que sea
+// visible que no es un setup canónico y exige calidad de oportunista (≥8).
+function detPullback(v, a){
+  if(!a || v.length<60) return null;
+  const cs=v.map(x=>x.c), e20=ema(cs,20), e50=ema(cs,50);
+  if(!e20||!e50) return null;
+  const u=v[v.length-1], px=u.c;
+  // tendencia definida: EMA20 y EMA50 alineadas y separadas > 0.3 ATR
+  const sep=(e20-e50)/a;
+  if(Math.abs(sep)<0.3) return null;
+  const alcista=sep>0;
+  // impulso reciente: el rango de las ultimas 12 velas supera 2.5 ATR
+  const w=v.slice(-12), rango=Math.max(...w.map(x=>x.h))-Math.min(...w.map(x=>x.l));
+  if(rango<2.5*a) return null;
+  // pullback: el precio volvio a menos de 0.5 ATR de la EMA20, DESDE el lado correcto
+  const dist=(px-e20)/a;
+  if(alcista && dist>-0.6 && dist<0.5 && u.c>u.o)
+    return {s:"Impulso+Pullback",d:"long",core:false,prio:6,extra:true,z:[e20-0.3*a,e20+0.2*a],
+      n:`tendencia alcista (EMA20/50 +${sep.toFixed(1)} ATR), pullback a EMA20 con vela de rechazo`};
+  if(!alcista && dist<0.6 && dist>-0.5 && u.c<u.o)
+    return {s:"Impulso+Pullback",d:"short",core:false,prio:6,extra:true,z:[e20-0.2*a,e20+0.3*a],
+      n:`tendencia bajista (EMA20/50 ${sep.toFixed(1)} ATR), pullback a EMA20 con vela de rechazo`};
+  return null;
+}
+
 // Prioridad POR TF de entrada (banco-setups.md), no ranking global.
 // PARIDAD EXACTA con PRIO_POR_TF del disparador Python: "Momentum-NY-Open" ocupa
 // su puesto AUNQUE el detector no exista aquí — si se omite, FVG-entrada sube un
@@ -270,9 +324,9 @@ function detMR(v,e200,vwap,a){ // Mean-Reversion SOLO en rango (gate de regimen)
 // del motor auditado (reproducido: BTC scalp JS=SHORT vs PY=LONG).
 const PRIO_TF = {"1m":["Mean-Reversion","Momentum-NY-Open","FVG-entrada"],
   "5m":["Mean-Reversion","Momentum-NY-Open","FVG-entrada"],
-  "15m":["Sweep+Reclaim","BOS+Retest","FVG-entrada","EQH/EQL-Sweep"],
-  "1h":["BOS+Retest","Sweep+Reclaim","FVG-entrada","EQH/EQL-Sweep"],
-  "4h":["BOS+Retest","Sweep+Reclaim","FVG-entrada"]};
+  "15m":["Sweep+Reclaim","BOS+Retest","FVG-entrada","EQH/EQL-Sweep","Momentum-NY-Open","Impulso+Pullback"],
+  "1h":["BOS+Retest","Sweep+Reclaim","FVG-entrada","EQH/EQL-Sweep","Impulso+Pullback"],
+  "4h":["BOS+Retest","Sweep+Reclaim","FVG-entrada","Impulso+Pullback"]};
 
 // ───────────────────────────── utilidades ─────────────────────────────
 let TICK=null, STEP=null, MINNOT=5;
@@ -357,8 +411,11 @@ function calcularCalidad(setup, tfSig, dir, ls, contra8, atrPct, sesion, conflic
   else { p+=0.3; d.push(["volatilidad",0.3,`ATR ${atrPct.toFixed(2)}% fuera de rango cómodo`]); }
 
   v=setup.core?1:0.4; p+=v; d.push(["tipo de setup",v,setup.core?"CORE":"oportunista"]);
-  // sin baseline historico (la app no descarga data.binance.vision): -2, como el Python
-  p-=2; d.push(["sin baseline histórico",-2,"percentiles no disponibles en la app"]);
+  // El -2 por "sin baseline" del Python NO se aplica aquí: allí es informativo
+  // (puede haberlo o no); en la web es ESTRUCTURAL — nunca hay percentiles — así
+  // que restaba 2 puntos fijos a todo y hacía el umbral de calidad inalcanzable.
+  // En su lugar se penaliza el setup EXTRA (no canónico del banco).
+  if(setup.extra){ p-=1; d.push(["setup fuera del banco de 12",-1,"continuación, no canónico"]); }
   if(sesion==="asia"||sesion==="weekend"){ p-=1; d.push(["sesión de baja liquidez",-1,sesion]); }
   if(conflicto){ p-=1; d.push(["conflicto de dirección entre TFs",-1,"gana el HTF"]); }
   return [Math.max(0,Math.min(10,p)), d];
@@ -481,7 +538,9 @@ function render(D, eq, estilo, E, sym){
     const cs=v.map(x=>x.c), a=atr(v), e200=ema(cs,200);
     const vt=v.slice(-30).reduce((s,x)=>s+x.vol,0);
     const vwap=vt?v.slice(-30).reduce((s,x)=>s+x.c*x.vol,0)/vt:null;
-    for(const d of [detSweep(v),detBOS(v,a),detFVG(v),detEQ(v),detMR(v,e200,vwap,a)])
+    for(const d of [detSweep(v),detBOS(v,a),detFVG(v),detEQ(v),detMR(v,e200,vwap,a),
+                    (tf==="5m"||tf==="15m")?detMomentumNY(v,a,now):null,
+                    detPullback(v,a)])
       if(d){ d.tf=tf; d.atr=a; setups.push(d); }
   }
   if(TC.core) setups=setups.filter(s=>s.core);
@@ -504,7 +563,10 @@ function render(D, eq, estilo, E, sym){
   let bloqueos=[], avisos=[], plan=null, calidad=null, calidadDet=null;
 
   if(!G){
-    H.push(vcard("no","NO OPERAR","ausencia de setup — tu checklist punto 3 exige setup del banco"));
+    H.push(vcard("no","NO OPERAR","ningún setup detectable ahora — ni del banco ni de continuación"));
+    H.push(`<div class="card"><div class="sub">Los detectores automáticos cubren 7 patrones.
+      CHoCH+OB, OB-HTF, Wyckoff, Three-Drives y Range-HVN son SEMI o MANUAL: si los ves
+      en tu gráfico, mándame captura con <b>opera</b> y los evalúo yo.</div></div>`);
   } else {
     // Las confluencias se calculan ANTES de dimensionar: el escalon "CORE con 1
     // confluencia faltante -> riesgo 0.75%" tiene que afectar el TAMAÑO, y antes
@@ -534,8 +596,11 @@ function render(D, eq, estilo, E, sym){
     if(evBloq) bloqueos.unshift(evBloq);
     if(liqBloq) bloqueos.unshift(liqBloq);
     plan.cf=cfPre;
-    if(cumplidas < (TC.core?TC.conf:TC.conf-1))
-      bloqueos.push(`solo ${cumplidas} confluencias de contexto (el tier ${tier} exige ${TC.conf})`);
+    // Las confluencias de CONTEXTO (derivados) alimentan la calidad, NO son un
+    // gate duro: el umbral "N confluencias" del banco se refiere a las
+    // ESTRUCTURALES de cada setup (OB/EMA-50/S-R, volumen del impulso,
+    // alineacion HTF), que solo Emmanuel puede verificar en su grafico.
+    // Aplicarles el numero del banco era una invencion que bloqueaba siempre.
     // setups OPORTUNISTAS exigen calidad >=8 (SKILL.md:192)
     const tfSig={};
     for(const t of ["1m","5m","15m","1h","4h","1d"]){
@@ -548,14 +613,28 @@ function render(D, eq, estilo, E, sym){
       a15c?a15c/D.mark*100:null,ses,conflicto,D.lsEdad);
     calidad=cal; calidadDet=calDet;
     const calMin=Math.max(TC.cal,E.cal);
-    if(!G.core && cal<8) bloqueos.push(`setup oportunista con calidad ${cal.toFixed(1)} < 8`);
-    if(!bloqueos.length && cal<calMin)
-      bloqueos.push(`calidad ${cal.toFixed(1)}/10 < mínimo ${calMin} para ${tier}/${estilo}`);
+    // La calidad se reporta SIEMPRE. Antes iba condicionada a `!bloqueos.length`,
+    // así que cualquier otro bloqueo la escondía y la lista de "qué falta" salía
+    // incompleta: parecía que arreglando una cosa se destrabaría el trade.
+    if(!G.core && cal<8) bloqueos.push(`setup oportunista con calidad ${cal.toFixed(1)} &lt; 8`);
+    else if(cal<calMin)
+      bloqueos.push(`calidad ${cal.toFixed(1)}/10 &lt; mínimo ${calMin} para ${tier}/${estilo}`);
 
-    const veredicto = bloqueos.length ? "NO OPERAR" : "OPERAR";
-    H.push(vcard(bloqueos.length?"no":"op", veredicto,
+    // Gates DUROS (riesgo real) vs BLANDOS (calidad/contexto). Los duros vetan;
+    // los blandos informan y bajan la nota, pero el plan se muestra igual para
+    // que Emmanuel decida con los numeros delante en vez de con una pantalla vacia.
+    const DURO=/granularidad|el tick |ticks \(mínimo|liquidez|colchón|margen|nocional|libro|PROHIBITIVO|evento|redondea|estructura por delante|demasiado ancho|supera el tope|lado equivocado|caducado|ETA a TP2|R neto TP1|colapsan/;
+    const duros=bloqueos.filter(b=>DURO.test(b));
+    const blandos=bloqueos.filter(b=>!DURO.test(b));
+    const veredicto = duros.length ? "NO OPERAR" : (blandos.length ? "MARGINAL" : "OPERAR");
+    H.push(vcard(duros.length?"no":(blandos.length?"wt":"op"), veredicto,
       `${G.s} ${G.d.toUpperCase()} en ${G.tf} · ${tier} · ${estilo} · calidad ${cal.toFixed(1)}/10 (mín ${calMin})`,
       bloqueos.length?bloqueos:null));
+    if(veredicto==="MARGINAL") H.push(`<div class="card"><div class="sub">
+      <b class="wa">MARGINAL</b> = no hay ningún impedimento de riesgo, pero la nota no llega
+      al mínimo de tu tier/estilo. El plan de abajo está calculado y es ejecutable;
+      la decisión de tomarlo con nota baja es tuya, y tu regla dice que no.</div></div>`);
+    bloqueos=duros;   // solo los duros suprimen el sizing
     H.push(`<div class="card"><h2>Calidad ${cal.toFixed(1)}/10</h2>${calDet.map(x=>
       `<div class="kv"><span class="k">${x[0]}</span><span class="v ${x[1]<0?'dn':x[1]>0?'up':'nd'}">${x[1]>=0?"+":""}${x[1].toFixed(2)}</span></div>
        <div class="sub" style="text-align:right">${x[2]}</div>`).join("")}</div>`);
@@ -768,7 +847,8 @@ function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8){
   p.entry=entry; p.stop=stop; p.stopPct=stopPct*100; p.atrPct=a/mk*100; p.ticks=ticks; p.tipo=tipo;
   // 1 decimal: con toFixed(0) un stop de 19.6 ticks se leía "20 ticks (mínimo 20)",
   // que parece una contradicción y hace desconfiar de la herramienta
-  if(ticks<TICKS_MIN){ p.bloq.push(`granularidad insuficiente: stop de ${ticks.toFixed(1)} ticks (mínimo ${TICKS_MIN}) — el R:R sería ficción`); return p; }
+  if(TICK/a > TICK_ATR_MAX){ p.bloq.push(`el tick (${TICK}) es el ${(TICK/a*100).toFixed(0)}% del ATR de ${G.tf}: este símbolo no puede expresar un stop con precisión en este TF`); return p; }
+  if(ticks<TICKS_MIN){ p.bloq.push(`stop de ${ticks.toFixed(1)} ticks (mínimo ${TICKS_MIN}): la cuantización distorsionaría el R:R`); return p; }
   const topeStop={scalp:0.015,intraday:0.04}[estilo];
   if(stopPct>topeStop){ p.bloq.push(`stop ${(stopPct*100).toFixed(2)}% supera el tope de ${topeStop*100}% para ${estilo}`); return p; }
   if(Math.abs(entry-stop)>2.5*a){ p.bloq.push(`stop de ${(Math.abs(entry-stop)/a).toFixed(1)} ATR: demasiado ancho para este setup`); return p; }
@@ -855,7 +935,15 @@ function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8){
       p.tps.forEach((t,j)=>t.tag=`TP${j+1}`);
       p.avisos.push(`salta-TP1: el original daba ${v1.rn.toFixed(2)}R < ${E.rr}; se opera directo a T2 con cierre 60/40`);
       if(p.tps[0].rn<E.rr) p.bloq.push(`ni saltando TP1 se alcanza el mínimo (${p.tps[0].rn.toFixed(2)}R < ${E.rr})`); }
-    else p.bloq.push(`R neto TP1 ${p.tps[0].rn.toFixed(2)} < mínimo ${E.rr} del estilo ${estilo}`); }
+    else {
+      // Si TP2 supera el mínimo aunque no llegue al 3R que tu regla exige para
+      // saltarse TP1, decirlo: es una decisión tuya informada, no un muro ciego.
+      const t2=p.tps[1];
+      const nota = (t2 && t2.rn>=E.rr)
+        ? ` — pero TP2 da ${t2.rn.toFixed(2)}R, que SÍ supera el mínimo. Tu regla exige TP2≥3R para saltar TP1; si operas directo a T2 con cierre 60/40, el R:R cumple. Decisión tuya.`
+        : "";
+      p.bloq.push(`R neto TP1 ${p.tps[0].rn.toFixed(2)} &lt; mínimo ${E.rr} del estilo ${estilo}${nota}`);
+    } }
   return p;
 }
 
