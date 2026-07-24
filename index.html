@@ -72,6 +72,11 @@
   td{padding:4px 0;text-align:right;font-variant-numeric:tabular-nums;
     border-top:1px solid var(--line)}
 
+  .cruce{margin-top:10px;padding-top:9px;border-top:1px dashed var(--line);
+    font-size:12.5px;line-height:1.5;color:var(--dim)}
+  .cruce b{color:var(--tx)}
+  .cruce.ok{color:var(--ok)} .cruce.mal{color:var(--no)} .cruce.ojo{color:var(--warn)}
+
   .up{color:var(--ok)} .dn{color:var(--no)} .nd{color:var(--dim2)}
   .wa{color:var(--warn)} .ac{color:var(--acc)}
   .pill{display:inline-block;font-size:10px;padding:1.5px 6px;border-radius:4px;
@@ -387,30 +392,30 @@ function calcularCalidad(setup, tfSig, dir, ls, contra8, atrPct, sesion, conflic
   const DOBLES=["funding no adverso","ballenas a favor vs retail"];
   const solo=(setup.cf||[]).filter(c=>!DOBLES.some(x=>c[0].startsWith(x)));
   const req=Math.max(1,solo.length), cum=solo.filter(c=>c[1]).length;
-  let v=3*Math.min(cum/req,1); p+=v; d.push(["confluencias de contexto",v,`${cum}/${req}`]);
+  let v=3*Math.min(cum/req,1); p+=v; d.push(["el mercado te acompaña",v,`${cum} de ${req} señales`]);
 
   const sg=Object.values(tfSig).filter(x=>x!=null);
   if(sg.length){ const neto=sg.reduce((a,b)=>a+b,0)/sg.length;
     const al=dir==="long"?neto:-neto; v=2*Math.max(0,Math.min(al,1));
-    p+=v; d.push(["alineación multi-TF",v,`neto ${neto>=0?"+":""}${neto.toFixed(2)}`]); }
-  else d.push(["alineación multi-TF",0,"s/d"]);
+    p+=v; d.push(["temporalidades del mismo lado",v,`${neto>=0?"+":""}${neto.toFixed(2)} de alineación`]); }
+  else d.push(["temporalidades del mismo lado",0,"sin datos"]);
 
   const viejas = edadLS!=null && edadLS>90;
   if(ls.tp&&ls.g&&!viejas){ const spr=ls.tp-ls.g, fav=dir==="long"?spr:-spr;
     v=1.5*Math.max(0,Math.min(fav/0.5,1)); p+=v;
-    d.push(["spread ballenas-retail",v,`${ls.tp.toFixed(2)} vs ${ls.g.toFixed(2)}`]); }
-  else d.push(["spread ballenas-retail",0, viejas?`serie de ${edadLS.toFixed(0)} min — no cuenta`:"s/d"]);
+    d.push(["los grandes van contigo",v,`${ls.tp.toFixed(2)} vs ${ls.g.toFixed(2)}`]); }
+  else d.push(["los grandes van contigo",0, viejas?`serie de ${edadLS.toFixed(0)} min — no cuenta`:"s/d"]);
 
   if(contra8==null) d.push(["funding",0,"s/d"]);
   else if(contra8<=FUND_OK){ p+=1.5; d.push(["funding",1.5,`${contra8>=0?"+":""}${contra8.toFixed(4)}% base-8h OK`]); }
   else if(contra8<=FUND_NO){ p+=0.6; d.push(["funding",0.6,`${contra8.toFixed(4)}% base-8h ALERTA`]); }
   else d.push(["funding",0,`${contra8.toFixed(4)}% base-8h PROHIBITIVO`]);
 
-  if(atrPct==null) d.push(["volatilidad",0,"s/d"]);
-  else if(atrPct>=0.2&&atrPct<=3){ p+=1; d.push(["volatilidad",1,`ATR ${atrPct.toFixed(2)}% operable`]); }
-  else { p+=0.3; d.push(["volatilidad",0.3,`ATR ${atrPct.toFixed(2)}% fuera de rango cómodo`]); }
+  if(atrPct==null) d.push(["se mueve lo suficiente",0,"s/d"]);
+  else if(atrPct>=0.2&&atrPct<=3){ p+=1; d.push(["se mueve lo suficiente",1,`ATR ${atrPct.toFixed(2)}% operable`]); }
+  else { p+=0.3; d.push(["se mueve lo suficiente",0.3,`ATR ${atrPct.toFixed(2)}% fuera de rango cómodo`]); }
 
-  v=setup.core?1:0.4; p+=v; d.push(["tipo de setup",v,setup.core?"CORE":"oportunista"]);
+  v=setup.core?1:0.4; p+=v; d.push(["qué tan bueno es el patrón",v,setup.core?"CORE":"oportunista"]);
   // El -2 por "sin baseline" del Python NO se aplica aquí: allí es informativo
   // (puede haberlo o no); en la web es ESTRUCTURAL — nunca hay percentiles — así
   // que restaba 2 puntos fijos a todo y hacía el umbral de calidad inalcanzable.
@@ -608,7 +613,7 @@ function render(D, eq, estilo, E, sym){
     const cumplidas=cfPre.filter(c=>c[1]).length;
     if(!TC.core && G.core && cumplidas===TC.conf-1){
       riesgo=Math.min(riesgo,0.75);
-      degr.push("CORE con 1 confluencia faltante → riesgo 0.75%");
+      degr.push("le falta 1 señal de acompañamiento: bajo el tamaño al 0.75% de la cuenta");
     }
 
     plan = dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8);
@@ -630,28 +635,44 @@ function render(D, eq, estilo, E, sym){
     // La calidad se reporta SIEMPRE. Antes iba condicionada a `!bloqueos.length`,
     // así que cualquier otro bloqueo la escondía y la lista de "qué falta" salía
     // incompleta: parecía que arreglando una cosa se destrabaría el trade.
-    if(!G.core && cal<8) bloqueos.push(`setup oportunista con calidad ${cal.toFixed(1)} &lt; 8`);
+    // ── DUROS vs BLANDOS, por ORIGEN y no por texto ──
+    // Antes se clasificaba con un regex contra el mensaje. Al reescribir los
+    // mensajes en lenguaje llano el regex dejo de casar y un NO OPERAR se
+    // degrado solo a MARGINAL: clasificar por el texto de la UI es fragil por
+    // construccion. Ahora: todo lo que sale de dimensionar() o de los gates de
+    // evento/liquidez es DURO (es riesgo real); lo que agrega la nota es BLANDO.
+    const duros=[...bloqueos];
+    const blandos=[];
+    if(!G.core && cal<8) blandos.push(`es un patrón oportunista, no de los principales: con esos exiges nota 8 y va en ${cal.toFixed(1)}`);
     else if(cal<calMin)
-      bloqueos.push(`calidad ${cal.toFixed(1)}/10 &lt; mínimo ${calMin} para ${tier}/${estilo}`);
-
-    // Gates DUROS (riesgo real) vs BLANDOS (calidad/contexto). Los duros vetan;
-    // los blandos informan y bajan la nota, pero el plan se muestra igual para
-    // que Emmanuel decida con los numeros delante en vez de con una pantalla vacia.
-    const DURO=/granularidad|el tick |ticks \(mínimo|liquidez|colchón|margen|nocional|libro|PROHIBITIVO|evento|redondea|estructura por delante|demasiado ancho|supera el tope|lado equivocado|caducado|ETA a TP2|R neto TP1|colapsan/;
-    const duros=bloqueos.filter(b=>DURO.test(b));
-    const blandos=bloqueos.filter(b=>!DURO.test(b));
+      blandos.push(`la nota del trade es <b>${cal.toFixed(1)} de 10</b> y para ${sym.replace("USDT","")} en ${estilo} necesitas ${calMin}`);
+    bloqueos=[...duros,...blandos];
     const veredicto = duros.length ? "NO OPERAR" : (blandos.length ? "MARGINAL" : "OPERAR");
     H.push(vcard(duros.length?"no":(blandos.length?"wt":"op"), veredicto,
-      `${G.s} ${G.d.toUpperCase()} en ${G.tf} · ${tier} · ${estilo} · calidad ${cal.toFixed(1)}/10 (mín ${calMin})`,
+      `${G.s} <b>${G.d==="long"?"a la alza":"a la baja"}</b> en velas de ${G.tf} · ${estilo} · nota ${cal.toFixed(1)}/10 (necesitas ${calMin})`,
       bloqueos.length?bloqueos:null));
-    if(veredicto==="MARGINAL") H.push(`<div class="card"><div class="sub">
-      <b class="wa">MARGINAL</b> = no hay ningún impedimento de riesgo, pero la nota no llega
-      al mínimo de tu tier/estilo. El plan de abajo está calculado y es ejecutable;
-      la decisión de tomarlo con nota baja es tuya, y tu regla dice que no.</div></div>`);
+    if(veredicto==="MARGINAL") H.push(`<div class="card">${cruce(
+      `<b class="wa">MARGINAL</b> quiere decir: <b>no hay nada peligroso</b> en este trade —
+       el tamaño, el stop y la liquidación están bien—, lo único que pasa es que la nota no
+       llega al mínimo que tú mismo pusiste. El plan de abajo está completo y se puede ejecutar
+       tal cual. Tomarlo con nota baja es decisión tuya; tu regla dice que no.`,"ojo")}</div>`);
     bloqueos=duros;   // solo los duros suprimen el sizing
-    H.push(`<div class="card"><h2>Calidad ${cal.toFixed(1)}/10</h2>${calDet.map(x=>
+    // que componente esta costando mas: el de mayor hueco contra su maximo
+    const TOPE={"el mercado te acompaña":3,"temporalidades del mismo lado":2,
+                "los grandes van contigo":1.5,"funding":1.5,
+                "se mueve lo suficiente":1,"qué tan bueno es el patrón":1};
+    const huecos=calDet.map(x=>[x[0],(TOPE[x[0]]||0)-x[1]]).filter(x=>x[1]>0.01)
+                       .sort((a,b)=>b[1]-a[1]);
+    const falta=(calMin-cal);
+    H.push(`<div class="card"><h2>Nota del trade · ${cal.toFixed(1)} de 10</h2>${calDet.map(x=>
       `<div class="kv"><span class="k">${x[0]}</span><span class="v ${x[1]<0?'dn':x[1]>0?'up':'nd'}">${x[1]>=0?"+":""}${x[1].toFixed(2)}</span></div>
-       <div class="sub" style="text-align:right">${x[2]}</div>`).join("")}</div>`);
+       <div class="sub" style="text-align:right">${x[2]}</div>`).join("")}
+      ${cruce(falta>0
+        ? `Te faltan <b>${falta.toFixed(1)} puntos</b> para el mínimo de ${calMin} que pide ${estilo}. ` +
+          (huecos.length ? `Lo que más te está costando: <b>${huecos[0][0]}</b> (${huecos[0][1].toFixed(1)} pts sin cobrar)${
+            huecos[1]?`, luego ${huecos[1][0]} (${huecos[1][1].toFixed(1)})`:""}.` : "")
+        : `Pasas el mínimo de ${calMin} con ${(cal-calMin).toFixed(1)} puntos de sobra.`,
+        falta>0?"ojo":"ok")}</div>`);
   }
 
   // ── alineación multi-TF, visible siempre ──
@@ -659,30 +680,22 @@ function render(D, eq, estilo, E, sym){
     const orden=["1m","5m","15m","1h","4h","1d"];
     const chips=orden.filter(t=>tfSig[t]!=null).map(t=>
       `<span class="pill ${tfSig[t]>0?'up':'dn'}">${t} ${tfSig[t]>0?"▲":"▼"}</span>`).join(" ");
-    const lado = netoTF>0.3?"alcista":netoTF<-0.3?"bajista":"sin sesgo claro";
-    H.push(`<div class="card"><h2>Alineación multi-TF</h2>
+    const arriba=sgArr.filter(x=>x>0).length, abajo=sgArr.length-arriba;
+    const unan = arriba===0 || abajo===0;
+    const lado = netoTF>0.3 ? (unan?"todas apuntan hacia arriba":"la mayoría apunta hacia arriba")
+               : netoTF<-0.3 ? (unan?"todas apuntan hacia abajo":"la mayoría apunta hacia abajo")
+               : "están divididas";
+    const aFavor = G ? (G.d==="long"?netoTF:-netoTF)>0 : null;
+    H.push(`<div class="card"><h2>Hacia dónde apunta cada temporalidad</h2>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">${chips}</div>
-      ${kv("neto", `<b class="${netoTF>0?'up':netoTF<0?'dn':'nd'}">${netoTF>=0?"+":""}${netoTF.toFixed(2)}</b>`,
-        `${lado} · precio vs EMA20 de cada TF (velas cerradas) · vale 2 de los 10 puntos de calidad`)}
-      ${G?`<div class="sub">tu setup es <b>${G.d.toUpperCase()}</b>: ${
-        (G.d==="long"?netoTF:-netoTF)>0 ? "a favor de la alineación" :
-        "<span class='wa'>en contra de la alineación — por eso este componente no suma</span>"}</div>`:""}</div>`);
-  }
-
-  // ── todos los setups detectados, no solo el ganador ──
-  if(setups.length){
-    const filas=setups.map((s,i)=>{
-      const gan = i===0;
-      const rk=(PRIO_TF[s.tf]||[]).indexOf(s.s);
-      return `<div class="kv"><span class="k">${gan?"<b>▶ ":""}${s.s} ${s.d.toUpperCase()} · ${s.tf}${gan?"</b>":""}</span>
-        <span class="v ${s.d==="long"?"up":"dn"}">${s.core?"CORE":s.extra?"extra":"oport."}</span></div>
-        <div class="sub" style="text-align:right">${rk<0?"fuera de la prioridad de ese TF":`prioridad ${rk+1} en ${s.tf}`}</div>`;
-    }).join("");
-    H.push(`<div class="card"><h2>Setups detectados (${setups.length})</h2>${filas}
-      <div class="sub" style="margin-top:6px">Se opera <b>uno</b>: gana el de mayor prioridad
-      en su TF (banco-setups.md), luego CORE sobre oportunista, luego el TF más cercano a
-      ${tfEnt} que es el de entrada de ${estilo}.${
-      conflicto?" <span class='wa'>Hay setups en direcciones opuestas: eso baja la calidad.</span>":""}</div></div>`);
+      ${kv("resumen", `<b class="${netoTF>0?'up':netoTF<0?'dn':'nd'}">${arriba} arriba / ${abajo} abajo</b>`,
+        `${lado} · verde = el precio va sobre su promedio de 20 velas`)}
+      ${cruce(G
+        ? `Tu trade es <b>${G.d==="long"?"a la alza (LONG)":"a la baja (SHORT)"}</b> y las temporalidades van ${
+            aFavor ? "<b>del mismo lado</b>. Eso te suma nota y hace más probable que el precio siga."
+                   : "<b>del lado contrario</b>. Estarías remando contra la corriente: por eso esta parte de la nota no suma."}`
+        : `${lado.charAt(0).toUpperCase()+lado.slice(1)}. Cuando aparezca un setup, si va del mismo lado suma nota; si va en contra, no.`,
+        G ? (aFavor?"ok":"mal") : "")}</div>`);
   }
 
   if(evOn) H.push(`<div class="card" style="border-color:rgba(240,169,46,.4)">
@@ -697,31 +710,59 @@ function render(D, eq, estilo, E, sym){
   if(plan && plan.entry){
     const p=plan, no=bloqueos.length;
     let planHtml=`<div class="card">
-      <h2>Plan ${G.d.toUpperCase()} ${no?'· <span class="dn">NO EJECUTAR — referencia</span>':''}</h2>
-      ${kv("entrada", `<b>${f(p.entry)}</b> <span class="pill">${p.tipo}</span>`)}
-      ${kv("stop", `<b class="dn">${f(p.stop)}</b>`, `${p.stopPct.toFixed(3)}% · ${p.ticks.toFixed(0)} ticks · ATR ${p.atrPct.toFixed(2)}%`)}`;
+      <h2>Cómo se opera · ${G.d==="long"?"A LA ALZA":"A LA BAJA"} ${no?'· <span class="dn">SOLO DE REFERENCIA, NO ENTRAR</span>':''}</h2>
+      ${kv("entras en", `<b>${f(p.entry)}</b> <span class="pill">${p.tipo}</span>`)}
+      ${kv("te sales si llega a", `<b class="dn">${f(p.stop)}</b>`,
+        `es ${p.stopPct.toFixed(2)}% del precio — el movimiento típico de una vela de ${G.tf} es ${p.atrPct.toFixed(2)}%`)}`;
     if(p.tps&&p.tps.length){
-      planHtml += p.tps.map(t=>kv(t.tag, `${f(t.px)} <span class="${t.rn>=E.rr?'up':'wa'}">${t.rn.toFixed(2)}R</span>`,
-        `${t.rb.toFixed(2)}R bruto · ETA ~${t.etaH.toFixed(1)}h${t.set?` · ${t.set} cobro(s) funding`:""}`)).join("")
-        + `<div class="sub" style="margin-top:6px">TP desde ${p.fuente} · R neto = bruto − fees − slippage − funding</div>`;
+      planHtml += p.tps.map(t=>kv(`cobras en ${t.tag}`, `${f(t.px)} <span class="${t.rn>=E.rr?'up':'wa'}">${t.rn.toFixed(2)}×</span>`,
+        `ganas ${t.rn.toFixed(2)} veces lo que arriesgas · llegaría en ~${t.etaH<1?Math.round(t.etaH*60)+" min":t.etaH.toFixed(1)+" h"}${
+          t.set?` · pagas funding ${t.set} vez(ces) en el camino`:""}`)).join("")
+        + `<div class="sub" style="margin-top:6px">Los objetivos salen de ${p.fuente}. El número
+           "×" ya trae descontadas las comisiones, el deslizamiento y el funding.</div>`;
     } else {
-      planHtml += `<div class="sub wa">sin objetivos calculados — ver el bloqueo arriba</div>`;
+      planHtml += `<div class="sub wa">sin objetivos calculados — mira el motivo arriba</div>`;
+    }
+    if(p.tps&&p.tps.length&&p.riesgoUsd){
+      const t1=p.tps[0];
+      planHtml += cruce(`Si el precio llega a tu stop pierdes <b class="dn">${p.riesgoUsd.toFixed(2)} USDT</b>.
+        Si llega al primer objetivo ganas <b class="up">${(p.riesgoUsd*t1.rn).toFixed(2)} USDT</b>.
+        O sea: arriesgas 1 para ganar ${t1.rn.toFixed(2)}${
+        t1.rn>=E.rr?`, y tu regla de ${estilo} pide al menos ${E.rr} — cumple.`
+                  :`, pero tu regla de ${estilo} pide al menos ${E.rr}.`}`,
+        t1.rn>=E.rr?"ok":"ojo");
     }
     H.push(planHtml+`</div>`);
 
-    if(p.qty) H.push(`<div class="card"><h2>Tamaño · equity ${eq.toLocaleString()} · riesgo ${riesgo}%</h2>
-      ${kv("riesgo", `${p.riesgoUsd.toFixed(2)} USDT`)}
-      ${kv("cantidad", `${p.qty.toLocaleString()} ${base}`, `nocional ${p.notional.toFixed(2)} USDT (${(p.notional/eq*100).toFixed(0)}% del equity)`)}
+    if(p.qty) H.push(`<div class="card"><h2>Cuánto meter · cuenta de ${eq.toLocaleString()} USDT</h2>
+      ${kv("cuánto puedes perder", `<b class="dn">${p.riesgoUsd.toFixed(2)} USDT</b>`, `el ${riesgo}% de tu cuenta`)}
+      ${kv("cuántas monedas", `${p.qty.toLocaleString()} ${base}`,
+        `la posición vale ${p.notional.toFixed(2)} USDT, o sea ${(p.notional/eq*100).toFixed(0)}% de tu cuenta`)}
       ${kv("apalancamiento", `<b class="ac">${p.lev}x</b> aislado`,
-        `máx por tu stop ${p.levStop.toFixed(1)}x · bracket ${p.br.seq} permite ${p.br.maxLev}x · tier ${tier} topa ${TC.lev}x`)}
-      ${kv("margen", `${p.margen.toFixed(2)} USDT`)}
-      ${kv("MMR real", `${(p.br.mmr*100).toFixed(3)}%`, `bracket ${p.br.seq}, cum ${p.br.cum}`)}
-      ${p.liq?kv("liquidación", `${f(p.liq)}`, `${p.liqPct.toFixed(3)}% de la entrada · colchón ${p.colchon.toFixed(1)}% <span class="wa">— TEÓRICA (aislado). Tu cuenta es PM: liquida por uniMMR a nivel de CUENTA</span>`):""}
-      ${p.friPct!=null?kv("fricción", `${p.friPct.toFixed(3)}%`, `slippage medido del libro ${p.slip.toFixed(2)} bps`):""}
+        `con tu stop aguantarías hasta ${p.levStop.toFixed(0)}x · Binance te deja ${p.br.maxLev}x · tu regla topa en ${TC.lev}x`)}
+      ${kv("margen que apartas", `${p.margen.toFixed(2)} USDT`, `es lo que se te congela mientras el trade esté abierto`)}
+      ${p.liq?kv("te liquidaría en", `${f(p.liq)}`,
+        `a ${p.liqPct.toFixed(2)}% de tu entrada — te queda ${p.colchon.toFixed(0)}% de aire después del stop`):""}
+      ${p.friPct!=null?kv("costo de entrar y salir", `${p.friPct.toFixed(3)}%`,
+        `≈ ${(p.notional*p.friPct/100).toFixed(2)} USDT en comisiones y deslizamiento`):""}
+      ${cruce(`Metes <b>${p.margen.toFixed(2)} USDT</b> de margen para mover
+        ${p.notional.toFixed(0)} USDT de ${base}. Pase lo que pase, si respetas el stop lo máximo
+        que pierdes son <b class="dn">${p.riesgoUsd.toFixed(2)} USDT</b> — el apalancamiento no
+        cambia eso, solo cambia cuánto margen se te congela.
+        ${p.liq?`La liquidación de ${f(p.liq)} es <b>teórica</b> y está lejos: tu stop salta mucho antes.
+        Además tu cuenta es Portfolio Margin, así que Binance no liquida esta posición sola sino
+        la cuenta completa por su margen global.`:""}`, "")}
     </div>`);
 
-    if(p.cf&&p.cf.length) H.push(`<div class="card"><h2>Confluencias de contexto</h2>
-      ${p.cf.map(c=>`<div class="kv"><span class="k">${c[1]?'<span class="up">✓</span>':'<span class="nd">✗</span>'} ${c[0]}</span></div>`).join("")}</div>`);
+    if(p.cf&&p.cf.length){
+      const ok=p.cf.filter(c=>c[1]).length;
+      H.push(`<div class="card"><h2>Qué tanto acompaña el resto del mercado</h2>
+      ${p.cf.map(c=>`<div class="kv"><span class="k">${c[1]?'<span class="up">✓</span>':'<span class="nd">✗</span>'} ${c[0]}</span></div>`).join("")}
+      ${cruce(`Se cumplen <b>${ok} de ${p.cf.length}</b>. No son un veto: cada una que se cumple
+        te sube la nota del trade. Son las señales de que el resto del mercado (financiamiento,
+        ballenas, quién está pegando, dinero entrando) empuja del mismo lado que tú.`,
+        ok>=p.cf.length/2?"ok":"ojo")}</div>`);
+    }
     if(avisos.length) H.push(`<div class="card">${avisos.map(a=>`<div class="wa" style="font-size:12.5px">⚠ ${a}</div>`).join("")}</div>`);
   }
 
@@ -730,25 +771,61 @@ function render(D, eq, estilo, E, sym){
   if(base.startsWith("1000")) H.push(`<div class="card" style="border-color:rgba(240,169,46,.4)">
     <span class="wa">⚠ CONTRATO ×1000</span><div class="sub">el precio es por 1000 ${base.slice(4)},
     no por 1 — tu gráfico de ${base.slice(4)} muestra un número 1000× distinto</div></div>`);
-  H.push(`<div class="card"><h2>Mercado</h2>
-    ${kv("mark", `<b>${f(D.mark)}</b>`, `index ${f(D.index)} · basis ${((D.mark/D.index-1)*1e4).toFixed(2)} bps · spread ${((D.ask/D.bid-1)*1e4).toFixed(2)} bps`)}
-    ${kv("24h", `<span class="${D.chg>=0?'up':'dn'}">${pct(D.chg)}</span>`, `volumen ${(D.vol/1e6).toFixed(1)}M USD`)}
-    ${kv("funding", `<span class="${fTier}">${D.fund>=0?"+":""}${D.fund.toFixed(4)}%</span> / ${D.ivH}h`,
-      `= ${(D.fund*8/D.ivH>=0?"+":"")}${(D.fund*8/D.ivH).toFixed(4)}% base-8h · próximo en ${D.fundNext.toFixed(0)} min`)}
-    ${kv("open interest", `${(D.oi/1e6).toFixed(1)}M ${base}`, D.oiUsd?`${(D.oiUsd/1e6).toFixed(1)}M USD · ${pct(D.oiChg)} 24h`:"")}
+  const nocional = (plan&&plan.notional) ? plan.notional : null;
+  const costo4h = contra8!==null && nocional ? nocional*(contra8/100)*(4/8) : null;
+  H.push(`<div class="card"><h2>Cómo está el mercado</h2>
+    ${kv("precio ahora", `<b>${f(D.mark)}</b>`,
+      `la referencia del índice va en ${f(D.index)} · comprar y vender cuesta ${((D.ask/D.bid-1)*1e4).toFixed(1)} centésimas de 1%`)}
+    ${kv("hoy lleva", `<span class="${D.chg>=0?'up':'dn'}">${pct(D.chg)}</span>`,
+      `se han movido ${(D.vol/1e6).toFixed(0)} millones de dólares en 24h`)}
+    ${kv("funding", `<span class="${fTier}">${D.fund>=0?"+":""}${D.fund.toFixed(4)}%</span> cada ${D.ivH}h`,
+      `${D.fund>=0?"ahorita los largos le pagan a los cortos":"ahorita los cortos le pagan a los largos"} · el próximo cobro es en ${D.fundNext.toFixed(0)} min`)}
+    ${kv("dinero abierto", `${(D.oi/1e6).toFixed(1)}M ${base}`,
+      D.oiUsd?`${(D.oiUsd/1e6).toFixed(0)}M USD en posiciones vivas · ${pct(D.oiChg)} en 24h`:"")}
+    ${cruce(contra8===null
+      ? `Sin setup todavía, así que el funding no se puede cruzar contra una dirección.`
+      : `${contra8<=0
+          ? `El funding va <b>a tu favor</b>: te <b class="up">pagan</b> por mantener el trade`
+          : `El funding va <b>en tu contra</b>: te <b class="dn">cobran</b> por mantener el trade`}${
+        costo4h!==null ? ` — unos <b>${Math.abs(costo4h).toFixed(2)} USDT si lo aguantas 4 horas</b>` : ""}.
+        ${Math.abs(contra8)<=FUND_OK ? "Es poco, no cambia nada."
+          : Math.abs(contra8)<=FUND_NO ? "Ya pesa: no lo dejes abierto más de 4 horas."
+          : "Está carísimo: a este nivel el trade se come solo."}
+        ${D.oiChg!=null ? ` El dinero abierto ${D.oiChg>1?"está <b>subiendo</b>, o sea entra gente nueva":
+          D.oiChg<-0.5?"está <b>bajando</b>, o sea la gente está cerrando":"casi no se mueve"}.`:""}`,
+      contra8===null?"":(contra8<=FUND_OK?"ok":contra8<=FUND_NO?"ojo":"mal"))}
   </div>`);
 
   // ── POSICIONAMIENTO ──
   const vieja=D.lsEdad>90, sp=D.ls.tp-D.ls.g;
-  H.push(`<div class="card"><h2>Posicionamiento · 3 series Binance</h2>
-    ${kv("retail (global)", D.ls.g.toFixed(4), `largos ${(D.ls.g/(1+D.ls.g)*100).toFixed(1)}% / cortos ${(100-D.ls.g/(1+D.ls.g)*100).toFixed(1)}%`)}
-    ${kv("top por CUENTA", D.ls.ta.toFixed(4))}
-    ${kv("top por POSICIÓN", `<b class="ac">${D.ls.tp.toFixed(4)}</b>`, "smart money")}
-    ${kv("spread ballenas−retail", `<span class="${sp>0?'up':'dn'}">${sp>=0?"+":""}${sp.toFixed(4)}</span>`,
-      sp>0?"ballenas más largas que retail":"ballenas más cortas que retail")}
-    ${kv("flujo agresor (taker)", D.taker.toFixed(4), D.taker>1?"compradores presionando":"vendedores presionando")}
-    ${kv("edad de estas series", `<span class="${vieja?'wa':'nd'}">${D.lsEdad.toFixed(0)} min</span>`,
-      `buckets de 1h${vieja?" — >90 min: NO cuentan como confluencia":""}`)}
+  const pctL = x => (x/(1+x)*100);
+  const ballenasLargas = D.ls.tp>1;
+  const aFavorBallenas = G ? (G.d==="long" ? sp>0.15 : sp<-0.15) : null;
+  H.push(`<div class="card"><h2>De qué lado está cada quién</h2>
+    ${kv("la gente común", `${pctL(D.ls.g).toFixed(0)}% a la alza`,
+      `${(100-pctL(D.ls.g)).toFixed(0)}% a la baja · son todas las cuentas de Binance`)}
+    ${kv("los grandes, por dinero", `<b class="ac">${pctL(D.ls.tp).toFixed(0)}% a la ${ballenasLargas?"alza":"baja"}</b>`,
+      `el top de traders pesado por el tamaño de su posición — es el dato que más importa`)}
+    ${kv("los grandes, por cabeza", `${pctL(D.ls.ta).toFixed(0)}% a la alza`,
+      `el mismo top pero contando cuentas, sin pesar cuánto mete cada uno`)}
+    ${kv("qué tan distinto piensan", `<span class="${sp>0?'up':'dn'}">${sp>=0?"+":""}${sp.toFixed(2)}</span>`,
+      sp>0?"los grandes están más a la alza que la gente común":"los grandes están más a la baja que la gente común")}
+    ${kv("quién está pegando ahora", `${D.taker>1?"compradores":"vendedores"}`,
+      `proporción ${D.taker.toFixed(2)} de órdenes que entran a mercado`)}
+    ${kv("frescura del dato", `<span class="${vieja?'wa':'nd'}">${D.lsEdad.toFixed(0)} min</span>`,
+      vieja?"⚠ más de 90 min: no lo cuento como confluencia":"reciente, sí cuenta")}
+    ${cruce(G
+      ? `Tu trade es <b>${G.d==="long"?"a la alza":"a la baja"}</b> y los grandes están
+         <b>${ballenasLargas?"a la alza":"a la baja"}</b>: ${
+         aFavorBallenas
+           ? `<b>van contigo</b>. Eso es de lo mejor que te puede pasar, te suma nota.`
+           : `<b>van del lado contrario</b>. Se puede operar igual, pero es exactamente el
+              escenario donde el precio te barre el stop antes de irse a tu favor. Por eso
+              esta parte de la nota no suma.`}`
+      : `Los grandes están <b>${ballenasLargas?"a la alza":"a la baja"}</b> y la gente común
+         ${pctL(D.ls.g)>50?"también a la alza":"a la baja"}. Cuando salga un setup, si va del
+         mismo lado que los grandes suma nota.`,
+      G ? (aFavorBallenas?"ok":"mal") : "")}
   </div>`);
 
   // ── MULTI-TF ──
@@ -764,18 +841,36 @@ function render(D, eq, estilo, E, sym){
       <td>${tri(e20)}</td><td>${tri(e200)}</td>
       <td class="${dl>0?'up':'dn'}">${dl==null?'—':dl.toFixed(0)+'%'}</td></tr>`;
   }
-  H.push(`<div class="card"><h2>Estructura multi-TF · velas cerradas</h2>
-    <table><thead><tr><th>TF</th><th>RSI</th><th>ATR%</th><th>EMA20</th><th>EMA200</th><th>Δ vela</th></tr></thead>
-    <tbody>${rows}</tbody></table></div>`);
+  H.push(`<div class="card"><h2>Detalle por temporalidad</h2>
+    <table><thead><tr><th>vela</th><th>fuerza</th><th>se mueve</th><th>corto</th><th>largo</th><th>presión</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    ${cruce(`<b>fuerza</b> = RSI: arriba de 70 viene muy comprado, abajo de 30 muy vendido.
+      <b>se mueve</b> = cuánto viaja una vela típica, en % — te dice qué tan lejos poner el stop.
+      <b>corto</b> y <b>largo</b> = si el precio va por encima (+) o por debajo (−) de su promedio
+      de 20 y de 200 velas. <b>presión</b> = qué tanto de la última vela fue de compradores.`)}</div>`);
 
   // ── SETUPS ──
-  H.push(`<div class="card"><h2>Setups automáticos</h2>${
+  // "no entiendo los setups automaticos tampoco, si estan activos o que":
+  // hay que decir sin rodeos que estan PASANDO AHORA y cual se opera.
+  H.push(`<div class="card"><h2>Patrones que veo ahora mismo</h2>${
     setups.length ? setups.map(s=>`<div class="kv"><span class="k">${s===G?'<span class="ac">▶</span>':'&nbsp;&nbsp;'}
-      <span class="pill">${s.tf}</span> ${s.s}</span><span class="v ${s.d==='long'?'up':'dn'}">${s.d.toUpperCase()}</span></div>
+      <span class="pill">${s.tf}</span> ${s.s}</span><span class="v ${s.d==='long'?'up':'dn'}">${
+      s.d==='long'?'A LA ALZA':'A LA BAJA'}</span></div>
       <div class="sub" style="margin-left:20px">${s.n}</div>`).join("")
-    : `<div class="nd" style="font-size:12.5px">ninguno de los detectables automáticamente.<br>
-       CHoCH+OB, OB-HTF, Three-Drives y Range-HVN son SEMI; Wyckoff es MANUAL:
-       requieren que marques la estructura — no se inventan.</div>`}</div>`);
+    : `<div class="nd" style="font-size:12.5px">Ninguno. No es que esté apagada: revisé las
+       velas cerradas de 1m a 1d y no hay ninguno de los 7 patrones que sé reconocer sola.</div>`}
+    ${cruce(setups.length
+      ? `Son patrones <b>activos en este momento</b>, sacados de las velas ya cerradas — no son
+         alertas viejas ni una lista de lo que existe. Solo se opera <b>uno</b>: el que tiene
+         <span class="ac">▶</span>, que es <b>${G.s} ${G.d==='long'?'a la alza':'a la baja'} en ${G.tf}</b>.
+         Gana porque en ${G.tf} es el patrón de mayor prioridad de tu banco${
+         setups.length>1?`; los otros ${setups.length-1} existen pero quedan de respaldo`:""}.${
+         conflicto?" <b class='wa'>Ojo: hay patrones apuntando a lados opuestos, y eso te baja la nota.</b>":""}`
+      : `Reviso solos: Sweep+Reclaim, BOS+Retest, FVG, EQH/EQL, Mean-Reversion, Momentum de
+         apertura NY e Impulso+Pullback. Los otros de tu banco —CHoCH+OB, OB de temporalidad
+         alta, Wyckoff, Three-Drives y Range-HVN— necesitan que <b>tú</b> marques la estructura
+         en el gráfico. Si ves uno, mándame captura con <b>opera</b> y lo evalúo yo.`,
+      setups.length?"":"ojo")}</div>`);
 
   // ── QUÉ VIGILAR + CUÁNDO VOLVER ──
   if(!G || bloqueos.length){
@@ -972,7 +1067,7 @@ function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8){
   if(p.tps.length<2){ p.bloq.push("los objetivos colapsan al cuantizar al tick"); return p; }
 
   const ref=p.tps[Math.min(1,p.tps.length-1)];
-  if(ref.etaH>E.maxH*1.5) p.bloq.push(`ETA a TP2 ~${ref.etaH.toFixed(1)}h excede el horizonte de ${estilo} (${E.maxH}h) — es otro estilo de trade`);
+  if(ref.etaH>E.maxH*1.5) p.bloq.push(`el segundo objetivo tardaría ~${ref.etaH<1?Math.round(ref.etaH*60)+" min":ref.etaH.toFixed(1)+" h"} en llegar, y ${estilo} es para trades de menos de ${E.maxH<1?E.maxH*60+" min":E.maxH+" h"} — esto es otro tipo de trade`);
   if(contra8!==null&&contra8>FUND_NO) p.bloq.push(`funding ${contra8.toFixed(4)}% base-8h PROHIBITIVO contra el trade`);
   else if(contra8!==null&&contra8>FUND_OK) p.avisos.push(`funding ${contra8.toFixed(4)}% base-8h ALERTA: no mantener más de 4h`);
   // salta-TP1 (checklist-pre-trade.md:49-50). El umbral era TP2>=3.0R fijo, heredado
@@ -987,8 +1082,8 @@ function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8){
       if(p.tps[0].rn<E.rr) p.bloq.push(`ni saltando TP1 se alcanza el mínimo (${p.tps[0].rn.toFixed(2)}R &lt; ${E.rr})`); }
     else {
       const t2=p.tps[1];
-      const nota = t2 ? ` (TP2 tampoco: ${t2.rn.toFixed(2)}R)` : " (no hay TP2)";
-      p.bloq.push(`R neto TP1 ${p.tps[0].rn.toFixed(2)} &lt; mínimo ${E.rr} del estilo ${estilo}${nota}`);
+      const nota = t2 ? ` — el segundo tampoco alcanza (${t2.rn.toFixed(2)}×)` : " y no hay un segundo objetivo";
+      p.bloq.push(`el primer objetivo solo da <b>${p.tps[0].rn.toFixed(2)}×</b> lo que arriesgas y tu regla de ${estilo} pide ${E.rr}×${nota}`);
     } }
   return p;
 }
@@ -1088,6 +1183,9 @@ function avisar(titulo, cuerpo){
 $("#al").onclick=toggleAvisos;
 
 // ───────────────────────────── UI ─────────────────────────────
+// Linea de cierre de cada tarjeta: que significa ESTO para el trade de hoy.
+// Sin esto la app era un volcado de metricas que no se cruzaban entre si.
+const cruce=(txt,tono)=>`<div class="cruce ${tono||""}">${txt}</div>`;
 const kv=(k,v,s)=>`<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>${s?`<div class="sub" style="text-align:right">${s}</div>`:""}`;
 const vcard=(cls,t,s,li)=>`<div class="verd ${cls}"><div class="t">${t}</div><div class="s">${s}</div>${
   li?`<ul>${li.map(x=>`<li>${x}</li>`).join("")}</ul>`:""}</div>`;
