@@ -106,7 +106,11 @@
   <div class="chips" id="chips"></div>
 
   <div class="row">
-    <div><label>Equity USDT</label><input id="eq" type="number" inputmode="decimal" value="1500"></div>
+    <div><label>Margen a meter</label><input id="mar" type="number" inputmode="decimal" value="50"></div>
+    <div><label>Apalancamiento</label><input id="lv" type="number" inputmode="numeric" value="25"></div>
+    <div><label>Tengo en la cuenta</label><input id="eq" type="number" inputmode="decimal" value="1500"></div>
+  </div>
+  <div class="row">
     <div><label>Estilo</label><select id="st">
       <option value="scalp">Scalp · 5-30m</option>
       <option value="intraday" selected>Intraday · 30m-4h</option>
@@ -164,6 +168,35 @@ const FUND_OK = 0.03, FUND_NO = 0.08, COLCHON = 0.25;
 // El gate anterior de 20 ticks FIJOS era incompatible con WLD por construccion:
 // su stop minimo de 0.5 ATR son 6.9 ticks. Bloqueaba absolutamente todo.
 const TICKS_MIN = 8, TICK_ATR_MAX = 0.25;
+
+// ── TEMPORALIDADES ──
+// TFS_OP  = las que usan los detectores y la nota de calidad (necesitan EMA200).
+// TFS_VER = solo para ver hacia dónde apunta cada una.
+// 45m y 3h NO existen en Binance: se arman agregando 3 velas de 15m y de 1h.
+const TFS_OP  = ["1m","5m","15m","1h","4h","1d"];
+const TFS_VER = ["3m","30m","2h","8h","12h","1w","1M"];
+const TF_VISTA = ["1m","3m","5m","15m","30m","45m","1h","2h","3h","4h","8h","12h","1d","1w","1M"];
+const MS = {"1m":6e4,"3m":18e4,"5m":3e5,"15m":9e5,"30m":18e5,"45m":27e5,"1h":36e5,
+            "2h":72e5,"3h":108e5,"4h":144e5,"8h":288e5,"12h":432e5,"1d":864e5,
+            "1w":6048e5,"1M":2592e6};
+
+// Agrega velas nativas en bloques anclados al epoch, para que las fronteras sean
+// las mismas entre recargas (no dependen de dónde empezó el array que llegó).
+function agrupa(v, ms){
+  if(!v || v.length<2) return [];
+  const paso = v[1].t - v[0].t;
+  const porBloque = Math.round(ms/paso);
+  const out=[]; let cur=null;
+  for(const k of v){
+    const ini = Math.floor(k.t/ms)*ms;
+    if(!cur || cur.t!==ini){ cur={t:ini,o:k.o,h:k.h,l:k.l,c:k.c,vol:k.vol,tbv:k.tbv,n:1}; out.push(cur); }
+    else { cur.h=Math.max(cur.h,k.h); cur.l=Math.min(cur.l,k.l); cur.c=k.c;
+           cur.vol+=k.vol; cur.tbv+=k.tbv; cur.n++; }
+  }
+  // el primer bloque suele venir cortado a media vela: no es comparable
+  if(out.length && out[0].n<porBloque) out.shift();
+  return out;
+}
 // ── TOPE DE TAMAÑO (fijado por Emmanuel, 2026-07-24) ──
 // 250 USD de margen como máximo, con hasta 75x.
 // Sustituye la escalera por nocional de protocolo-sizing.md:15-17 (50x hasta
@@ -448,15 +481,22 @@ function calcularCalidad(setup, tfSig, dir, ls, contra8, atrPct, sesion, conflic
 // ───────────────────────────── motor ─────────────────────────────
 async function correr(){
   const eq=+$("#eq").value||1500, estilo=$("#st").value, E=ESTILOS[estilo];
+  // Emmanuel dimensiona como en Binance: pone MARGEN y X, no un % de riesgo.
+  // El riesgo pasa a ser una SALIDA — cuanto acaba arriesgando con ese tamano.
+  const marUsr=+$("#mar").value||0, levUsr=+$("#lv").value||0;
   const sym=SYM+"USDT";
   localStorage.setItem("eq",eq); localStorage.setItem("st",estilo); localStorage.setItem("sym",SYM);
+  localStorage.setItem("mar",marUsr); localStorage.setItem("lv",levUsr);
   $("#hsym").textContent=SYM;
   LAST=null;   // invalida el estado anterior: si esta corrida falla, el boton
   //              Copiar no puede entregar datos viejos con hora nueva
   $("#out").innerHTML=`<div class="card" style="text-align:center;color:var(--dim)">
     <span class="spin"></span> consultando Binance…</div>`;
 
-  const TFS=["1m","5m","15m","1h","4h","1d"];
+  // TF que se PIDEN a Binance. Los de operativa y contexto con 210 velas (hacen
+  // falta para EMA200 y para los detectores); los de solo-vista con 60, de sobra
+  // para la EMA20 de la alineación y así no se gastan datos del celular de más.
+  const TFS=[...TFS_OP, ...TFS_VER];
   let D={};
   try{
     // Filtros del simbolo (tick/step/minNotional).
@@ -495,8 +535,11 @@ async function correr(){
     D.oi=+oi.openInterest; D.vol=+t24.quoteVolume; D.chg=+t24.priceChangePercent;
     D.libro=depth; D.bid=+depth.bids[0][0]; D.ask=+depth.asks[0][0];
 
-    const kl = await Promise.all(TFS.map(tf=>get("/fapi/v1/klines",{symbol:sym,interval:tf,limit:210})));
+    const kl = await Promise.all(TFS.map(tf=>get("/fapi/v1/klines",
+      {symbol:sym,interval:tf,limit:TFS_OP.includes(tf)?210:60})));
     D.v={}; TFS.forEach((tf,i)=>{ D.v[tf]=kl[i].map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],vol:+k[5],tbv:+k[9]})); });
+    D.v["45m"]=agrupa(D.v["15m"],MS["45m"]);
+    D.v["3h"] =agrupa(D.v["1h"], MS["3h"]);
 
     // las TRES series L/S + taker + OI hist (Binance-exclusivo)
     // period=5m, NO 1h. Medido contra fapi el 2026-07-24: con period=1h la última
@@ -536,10 +579,10 @@ async function correr(){
       Si es 418/429, tu IP está momentáneamente limitada — espera unos minutos.</span></div>`;
     return;
   }
-  render(D, eq, estilo, E, sym);
+  render(D, eq, estilo, E, sym, marUsr, levUsr);
 }
 
-function render(D, eq, estilo, E, sym){
+function render(D, eq, estilo, E, sym, marUsr, levUsr){
   const base=SYM, [tier,TC]=tierDe(base);
   const now=new Date(), ses=sesionCST(now);
   let riesgo=TC.r, degr=[];
@@ -593,14 +636,24 @@ function render(D, eq, estilo, E, sym){
   // ── alineación multi-TF: se calcula SIEMPRE y se muestra SIEMPRE ──
   // Antes vivía dentro del bloque "hay setup" y no se renderizaba nunca: alimentaba
   // 2 de los 10 puntos de calidad sin que se pudiera ver de dónde salían.
+  // Dirección de UNA temporalidad: precio de la última vela cerrada contra su EMA20.
+  const dirTF = t => {
+    const c0=D.v[t]; if(!c0) return null;
+    const vv=cerradas(c0); if(vv.length<21) return null;   // lo que necesita una EMA20
+    const cs=vv.map(x=>x.c), e20=ema(cs,20);
+    return e20 ? (cs[cs.length-1]>e20 ? 1 : -1) : null;
+  };
+  // tfSig alimenta la NOTA y se queda en las 6 temporalidades de siempre: meter
+  // 15 en el promedio cambiaría la rúbrica en silencio.
   const tfSig={};
-  for(const t of ["1m","5m","15m","1h","4h","1d"]){
-    const c0=D.v[t]; if(!c0||c0.length<201) continue;
-    const vv=cerradas(c0), cs=vv.map(x=>x.c), e20=ema(cs,20);
-    tfSig[t]= e20 && cs[cs.length-1]>e20 ? 1 : -1;
-  }
+  for(const t of TFS_OP){ const s=dirTF(t); if(s!=null) tfSig[t]=s; }
+  // tfVista es solo para mirar: las 15 que pidió Emmanuel.
+  const tfVista={};
+  for(const t of TF_VISTA){ const s=dirTF(t); if(s!=null) tfVista[t]=s; }
   const sgArr=Object.values(tfSig).filter(x=>x!=null);
   const netoTF=sgArr.length?sgArr.reduce((a,b)=>a+b,0)/sgArr.length:null;
+  const vArr=Object.values(tfVista);
+  const netoVista=vArr.length?vArr.reduce((a,b)=>a+b,0)/vArr.length:null;
 
   let H=[];
   // ═══ VEREDICTO ═══
@@ -650,7 +703,7 @@ function render(D, eq, estilo, E, sym){
     const rrEfec = estilo==="scalp" ? (cal>=8 ? 1.3 : 2.0) : E.rr;
     const E2 = {...E, rr: rrEfec};
 
-    plan = dimensionar(D,G,eq,riesgo,estilo,E2,TC,sym,contra,contra8);
+    plan = dimensionar(D,G,eq,riesgo,estilo,E2,TC,sym,contra,contra8,marUsr,levUsr);
     bloqueos=plan.bloq; avisos=plan.avisos;
     if(evBloq) bloqueos.unshift(evBloq);
     if(liqBloq) bloqueos.unshift(liqBloq);
@@ -702,26 +755,35 @@ function render(D, eq, estilo, E, sym){
   }
 
   // ── alineación multi-TF, visible siempre ──
-  if(sgArr.length){
-    const orden=["1m","5m","15m","1h","4h","1d"];
-    const chips=orden.filter(t=>tfSig[t]!=null).map(t=>
-      `<span class="pill ${tfSig[t]>0?'up':'dn'}">${t} ${tfSig[t]>0?"▲":"▼"}</span>`).join(" ");
-    const arriba=sgArr.filter(x=>x>0).length, abajo=sgArr.length-arriba;
+  if(vArr.length){
+    // Las 6 que cuentan para la nota van marcadas; las demás son solo lectura.
+    const chips=TF_VISTA.filter(t=>tfVista[t]!=null).map(t=>
+      `<span class="pill ${tfVista[t]>0?'up':'dn'}"${TFS_OP.includes(t)?' style="outline:1px solid var(--acc);outline-offset:1px"':''}>${t} ${tfVista[t]>0?"▲":"▼"}</span>`).join(" ");
+    const faltan=TF_VISTA.filter(t=>tfVista[t]==null);
+    const arriba=vArr.filter(x=>x>0).length, abajo=vArr.length-arriba;
     const unan = arriba===0 || abajo===0;
-    const lado = netoTF>0.3 ? (unan?"todas apuntan hacia arriba":"la mayoría apunta hacia arriba")
-               : netoTF<-0.3 ? (unan?"todas apuntan hacia abajo":"la mayoría apunta hacia abajo")
+    const lado = netoVista>0.3 ? (unan?"todas apuntan hacia arriba":"la mayoría apunta hacia arriba")
+               : netoVista<-0.3 ? (unan?"todas apuntan hacia abajo":"la mayoría apunta hacia abajo")
                : "están divididas";
-    const aFavor = G ? (G.d==="long"?netoTF:-netoTF)>0 : null;
+    const aFavor = G ? (G.d==="long"?netoVista:-netoVista)>0 : null;
+    const aFavorNota = G ? (G.d==="long"?netoTF:-netoTF)>0 : null;
     H.push(`<div class="card"><h2>Hacia dónde apunta cada temporalidad</h2>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">${chips}</div>
-      ${kv("resumen", `<b class="${netoTF>0?'up':netoTF<0?'dn':'nd'}">${arriba} arriba / ${abajo} abajo</b>`,
-        `${lado} · verde = el precio va sobre su promedio de 20 velas`)}
+      ${kv("resumen", `<b class="${netoVista>0?'up':netoVista<0?'dn':'nd'}">${arriba} arriba / ${abajo} abajo</b>`,
+        `${lado} · verde = el precio va sobre su promedio de 20 velas de esa temporalidad`)}
+      ${faltan.length?`<div class="sub">sin suficiente historia para ${faltan.join(" · ")}</div>`:""}
       ${cruce(G
-        ? `Tu trade es <b>${G.d==="long"?"a la alza (LONG)":"a la baja (SHORT)"}</b> y las temporalidades van ${
-            aFavor ? "<b>del mismo lado</b>. Eso te suma nota y hace más probable que el precio siga."
-                   : "<b>del lado contrario</b>. Estarías remando contra la corriente: por eso esta parte de la nota no suma."}`
+        ? `Tu trade es <b>${G.d==="long"?"a la alza (LONG)":"a la baja (SHORT)"}</b> y en conjunto las
+           temporalidades van <b>${aFavor?"del mismo lado":"del lado contrario"}</b>.
+           ${aFavorNota===aFavor ? "" : `Ojo: en las 6 que cuentan para la nota van del lado
+           ${aFavorNota?"contrario":"mismo"}, y esas son las que mueven el puntaje.`}
+           ${aFavorNota ? "Esa parte de la nota sí te suma."
+                        : "Por eso esa parte de la nota no te suma."}`
         : `${lado.charAt(0).toUpperCase()+lado.slice(1)}. Cuando aparezca un setup, si va del mismo lado suma nota; si va en contra, no.`,
-        G ? (aFavor?"ok":"mal") : "")}</div>`);
+        G ? (aFavorNota?"ok":"mal") : "")}
+      <div class="sub" style="margin-top:6px">Las ${TFS_OP.length} con borde
+        (${TFS_OP.join(", ")}) son las que entran en la nota. 45m y 3h no existen en
+        Binance: se arman juntando 3 velas de 15m y de 1h.</div></div>`);
   }
 
   if(evOn) H.push(`<div class="card" style="border-color:rgba(240,169,46,.4)">
@@ -765,8 +827,12 @@ function render(D, eq, estilo, E, sym){
     }
     H.push(planHtml+`</div>`);
 
-    if(p.qty) H.push(`<div class="card"><h2>Cuánto meter · cuenta de ${eq.toLocaleString()} USDT</h2>
-      ${kv("cuánto puedes perder", `<b class="dn">${p.riesgoUsd.toFixed(2)} USDT</b>`, `el ${riesgo}% de tu cuenta`)}
+    if(p.qty) H.push(`<div class="card"><h2>${p.manual?"Tu tamaño":"Cuánto meter"} · cuenta de ${eq.toLocaleString()} USDT</h2>
+      ${(()=>{ const pc=p.riesgoUsd/eq*100, alto=pc>riesgo+0.01;
+        return kv("cuánto puedes perder", `<b class="dn">${p.riesgoUsd.toFixed(2)} USDT</b>`,
+          p.manual
+            ? `es el <b class="${alto?'wa':'up'}">${pc.toFixed(2)}%</b> de tus ${eq.toLocaleString()} USDT · tu regla para este trade es ${riesgo}%`
+            : `el ${riesgo}% de tu cuenta`); })()}
       ${kv("cuántas monedas", `${p.qty.toLocaleString()} ${base}`,
         `la posición vale ${p.notional.toFixed(2)} USDT, o sea ${(p.notional/eq*100).toFixed(0)}% de tu cuenta`)}
       ${kv("apalancamiento", `<b class="ac">${p.lev}x</b> aislado`,
@@ -798,12 +864,19 @@ function render(D, eq, estilo, E, sym){
         ${p.notional.toFixed(0)} USDT de ${base}. Pase lo que pase, si respetas el stop lo máximo
         que pierdes son <b class="dn">${p.riesgoUsd.toFixed(2)} USDT</b> — el apalancamiento no
         cambia eso, solo cambia cuánto margen se te congela.
-        ${p.recorte
-          ? `<b class="wa">Este tamaño va recortado por tu tope de ${MARGEN_MAX} USDT de margen</b>:
-             tu riesgo del ${riesgo}% pedía ${p.recorte.margenPedido.toFixed(0)} USDT de margen, así que
-             acabas arriesgando ${p.riesgoUsd.toFixed(2)} en vez de ${p.recorte.riesgoPedido.toFixed(2)}.`
-          : `Tu tope son ${MARGEN_MAX} USDT de margen y aquí solo ocupas ${p.margen.toFixed(0)}: no lo
-             alcanzas porque el que manda es tu riesgo del ${riesgo}% de la cuenta.`}
+        ${p.manual
+          ? (()=>{ const pc=p.riesgoUsd/eq*100;
+              return pc>riesgo+0.01
+                ? `<b class="wa">Ese tamaño arriesga el ${pc.toFixed(2)}% de tu cuenta y tu regla para
+                   este trade es ${riesgo}%.</b> Para quedarte en el ${riesgo}% con este stop, el margen
+                   tendría que ser <b>${(eq*riesgo/100/stopPctDe(p)/p.lev).toFixed(0)} USDT</b> a ${p.lev}x.`
+                : `Arriesgas el ${pc.toFixed(2)}% de tu cuenta y tu regla permite hasta ${riesgo}%: vas dentro.`; })()
+          : (p.recorte
+            ? `<b class="wa">Este tamaño va recortado por tu tope de ${MARGEN_MAX} USDT de margen</b>:
+               tu riesgo del ${riesgo}% pedía ${p.recorte.margenPedido.toFixed(0)} USDT de margen, así que
+               acabas arriesgando ${p.riesgoUsd.toFixed(2)} en vez de ${p.recorte.riesgoPedido.toFixed(2)}.`
+            : `Tu tope son ${MARGEN_MAX} USDT de margen y aquí solo ocupas ${p.margen.toFixed(0)}: no lo
+               alcanzas porque el que manda es tu riesgo del ${riesgo}% de la cuenta.`)}
         ${p.liq?`La liquidación de ${f(p.liq)} es <b>teórica</b> y está lejos: tu stop salta mucho antes.
         Además tu cuenta es Portfolio Margin, así que Binance no liquida esta posición sola sino
         la cuenta completa por su margen global.`:""}`, "")}
@@ -885,8 +958,8 @@ function render(D, eq, estilo, E, sym){
 
   // ── MULTI-TF ──
   let rows="";
-  for(const tf of ["1m","5m","15m","1h","4h","1d"]){
-    const cr=D.v[tf]; if(!cr||cr.length<31){ rows+=`<tr><td>${tf}</td><td colspan="5" class="nd">sin historia</td></tr>`; continue; }
+  for(const tf of TF_VISTA){
+    const cr=D.v[tf]; if(!cr||cr.length<22){ rows+=`<tr><td>${tf}</td><td colspan="5" class="nd">sin historia</td></tr>`; continue; }
     const v=cerradas(cr), cs=v.map(x=>x.c), a=atr(v), e20=ema(cs,20), e200=ema(cs,200);
     const px=cs[cs.length-1], u=v[v.length-1], r=rsi(cs);
     const dl=u.vol?((2*u.tbv-u.vol)/u.vol*100):null;
@@ -1013,7 +1086,7 @@ function render(D, eq, estilo, E, sym){
   $("#clock").textContent=now.toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"})+" · "+ses;
 }
 
-function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8){
+function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8,marUsr,levUsr){
   // bloq = DUROS (vetan) · blandos = advertencias que solo degradan a MARGINAL
   const p={bloq:[],avisos:[],blandos:[]};
   const a=G.atr||atr(cerradas(D.v[G.tf]));
@@ -1049,29 +1122,61 @@ function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8){
   if(stopPct>topeStop){ p.bloq.push(`stop ${(stopPct*100).toFixed(2)}% supera el tope de ${topeStop*100}% para ${estilo}`); return p; }
   if(Math.abs(entry-stop)>2.5*a){ p.bloq.push(`stop de ${(Math.abs(entry-stop)/a).toFixed(1)} ATR: demasiado ancho para este setup`); return p; }
 
-  const riesgoUsd=eq*riesgo/100; let notional=riesgoUsd/stopPct;
+  // ── DOS MODOS DE DIMENSIONAR ──
+  // MANUAL: Emmanuel escribe margen y X, como en Binance. El nocional sale de
+  //   ahi y el riesgo es una SALIDA: cuanto acaba perdiendo si le pega el stop.
+  // AUTOMATICO (si deja el margen en 0): el nocional sale del % de riesgo.
+  const manual = marUsr>0 && levUsr>0;
+  let notional, riesgoUsd;
+  if(manual){
+    p.manual=true;
+    p.margenPedido=Math.min(marUsr,MARGEN_MAX);
+    if(marUsr>MARGEN_MAX) p.avisos.push(`pediste ${marUsr} USDT de margen y tu tope son ${MARGEN_MAX}: uso ${MARGEN_MAX}`);
+    notional = p.margenPedido*levUsr;
+    riesgoUsd = notional*stopPct;
+  } else {
+    riesgoUsd = eq*riesgo/100;
+    notional  = riesgoUsd/stopPct;
+  }
   p.riesgoUsd=riesgoUsd;
 
-  // apalancamiento: 4 techos, gana el MENOR
-  let br=null, lev=null;
-  for(let i=0;i<3;i++){
-    br=bracketDe(sym,notional); if(!br){ p.bloq.push("sin brackets para este símbolo"); return p; }
-    const lr=levMaxPorStop(stopPct,br.mmr);
-    const nl=Math.max(1,Math.floor(Math.min(lr,br.maxLev,TC.lev,LEV_MAX_USR)));
-    if(nl===lev) break; lev=nl;
+  let br=bracketDe(sym,notional);
+  if(!br){ p.bloq.push("sin brackets para este símbolo"); return p; }
+  let lev;
+  p.levStop=levMaxPorStop(stopPct,br.mmr);
+
+  if(manual){
+    lev=Math.floor(levUsr);
+    // Estos dos SI vetan y no es capricho: por encima de levStop la liquidacion
+    // cae ANTES que el stop, o sea el stop nunca llega a ejecutarse. Y por encima
+    // del maximo del bracket, Binance simplemente rechaza la orden.
+    if(lev>br.maxLev){
+      p.bloq.push(`pediste ${lev}x y Binance solo permite ${br.maxLev}x con una posición de ${notional.toFixed(0)} USDT en ${sym.replace("USDT","")}`); return p; }
+    if(lev>p.levStop){
+      p.bloq.push(`a ${lev}x te liquidarían ANTES de que llegue tu stop: con este stop de ${(stopPct*100).toFixed(2)}% el máximo real son <b>${Math.floor(p.levStop)}x</b>`); return p; }
+  } else {
+    lev=null;
+    for(let i=0;i<3;i++){
+      br=bracketDe(sym,notional); if(!br){ p.bloq.push("sin brackets para este símbolo"); return p; }
+      const nl=Math.max(1,Math.floor(Math.min(levMaxPorStop(stopPct,br.mmr),br.maxLev,TC.lev,LEV_MAX_USR)));
+      if(nl===lev) break; lev=nl;
+    }
+    p.levStop=levMaxPorStop(stopPct,br.mmr);
   }
-  p.br=br; p.lev=lev; p.levStop=levMaxPorStop(stopPct,br.mmr);
+  p.br=br; p.lev=lev;
 
   const qty=q(notional/entry,STEP);
   if(qty<=0){ p.bloq.push(`cantidad redondea a 0 (step ${STEP})`); return p; }
   const notReal=qty*entry;
   if(notReal<MINNOT){ p.bloq.push(`nocional ${notReal.toFixed(2)} < mínimo ${MINNOT} USDT`); return p; }
   p.qty=qty; p.notional=notReal; p.margen=notReal/lev;
+  // al cuantizar al step, el nocional real cambia un poco: el riesgo se recalcula
+  if(p.manual) p.riesgoUsd = notReal*stopPct;
 
-  // Tope duro de 250 USD de margen. Si el tamaño que sale del riesgo pide más,
-  // se recorta la cantidad hasta que el margen quepa. Se avisa, porque el trade
-  // deja de arriesgar el % pedido y pasa a arriesgar menos.
-  if(p.margen>MARGEN_MAX){
+  // Tope duro de 250 USD de margen. En modo manual el margen ya viene topado
+  // arriba, así que esto solo aplica al dimensionamiento automático: si el tamaño
+  // que sale del riesgo pide más, se recorta y se avisa.
+  if(!p.manual && p.margen>MARGEN_MAX){
     const qc=q(MARGEN_MAX*lev/entry,STEP);
     if(qc<=0){ p.bloq.push(`con tu tope de ${MARGEN_MAX} USDT de margen la cantidad redondea a 0`); return p; }
     const notC=qc*entry;
@@ -1095,7 +1200,12 @@ function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8){
       if((dl-stopPct)/dl>=COLCHON){ p.liq=lq; p.liqPct=dl*100; p.colchon=(dl-stopPct)/dl*100; break; }
       lev--; bajadas++;
     }
-    if(bajadas){ p.lev=lev; p.margen=p.notional/lev; p.levBajado=bajadas; }
+    if(bajadas){
+      p.lev=lev; p.margen=p.notional/lev; p.levBajado=bajadas;
+      // en modo manual el apalancamiento lo puso Emmanuel: bajarlo en silencio
+      // seria cambiarle la orden por detras
+      if(p.manual) p.avisos.push(`bajé de ${Math.floor(levUsr)}x a <b>${lev}x</b> para que quede el ${COLCHON*100}% de aire entre tu stop y la liquidación; el margen sube a ${p.margen.toFixed(2)} USDT`);
+    }
     if(p.liq==null){
       const lq=liqPx(entry,p.qty,lev,br.mmr,br.cum,dir);
       if(lq){ const dl=Math.abs(entry-lq)/entry;
@@ -1212,8 +1322,8 @@ function textoParaClaude(){
   L.push(`OI ${(D.oi/1e6).toFixed(1)}M${D.oiUsd?` (${(D.oiUsd/1e6).toFixed(1)}M USD, ${pct(D.oiChg)} 24h)`:""}`);
   L.push(`L/S retail ${D.ls.g.toFixed(4)} · topCUENTA ${D.ls.ta.toFixed(4)} · topPOSICIÓN ${D.ls.tp.toFixed(4)} · spread ${(D.ls.tp-D.ls.g>=0?"+":"")}${(D.ls.tp-D.ls.g).toFixed(4)} · taker ${D.taker.toFixed(3)} · edad ${D.lsEdad.toFixed(0)}min${D.lsEdad>90?" (VIEJA >90min, no cuenta)":""}`);
   const tf=[];
-  for(const t of ["1m","5m","15m","1h","4h","1d"]){
-    const cr=D.v[t]; if(!cr||cr.length<31) continue;
+  for(const t of TF_VISTA){
+    const cr=D.v[t]; if(!cr||cr.length<22) continue;
     const v=cerradas(cr), cs=v.map(x=>x.c), a=atr(v), e20=ema(cs,20), e200=ema(cs,200), px=cs[cs.length-1];
     tf.push(`${t}:RSI${(rsi(cs)||0).toFixed(0)}/ATR${a?(a/px*100).toFixed(2):"?"}%/${e20&&px>e20?"+":"−"}EMA20/${e200?(px>e200?"+":"−"):"?"}EMA200`);
   }
@@ -1291,6 +1401,7 @@ $("#al").onclick=toggleAvisos;
 // ───────────────────────────── UI ─────────────────────────────
 // Linea de cierre de cada tarjeta: que significa ESTO para el trade de hoy.
 // Sin esto la app era un volcado de metricas que no se cruzaban entre si.
+const stopPctDe = p => (p.stopPct||0)/100;
 const cruce=(txt,tono)=>`<div class="cruce ${tono||""}">${txt}</div>`;
 const kv=(k,v,s)=>`<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>${s?`<div class="sub" style="text-align:right">${s}</div>`:""}`;
 const vcard=(cls,t,s,li)=>`<div class="verd ${cls}"><div class="t">${t}</div><div class="s">${s}</div>${
@@ -1307,8 +1418,11 @@ $("#chips").onclick=e=>{ const c=e.target.closest(".chip"); if(!c) return;
   tick(true); };
 $("#go").onclick=()=>tick(true);
 $("#st").onchange=()=>tick(true);
-$("#eq").onchange=()=>localStorage.setItem("eq",$("#eq").value);
-if(localStorage.getItem("eq")) $("#eq").value=localStorage.getItem("eq");
+for(const k of ["eq","mar","lv"]){
+  const el=$("#"+(k==="lv"?"lv":k));
+  el.onchange=()=>localStorage.setItem(k, el.value);
+  const g=localStorage.getItem(k); if(g) el.value=g;
+}
 if(localStorage.getItem("st")) $("#st").value=localStorage.getItem("st");
 
 // Auto-refresh adaptativo. Un solo temporizador, sin solapes.
