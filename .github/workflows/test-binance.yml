@@ -1,0 +1,15 @@
+name: test-binance-desde-actions
+on: [workflow_dispatch]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Puede Actions llegar a Binance Futures?
+        run: |
+          IP=$(curl -s --max-time 10 https://api.ipify.org); echo "IP runner: $IP"
+          PAIS=$(curl -s --max-time 10 "http://ip-api.com/line/${IP}?fields=countryCode"); echo "pais: $PAIS"
+          for EP in "fapi/v1/premiumIndex?symbol=WLDUSDT" "fapi/v1/klines?symbol=WLDUSDT&interval=15m&limit=2" "futures/data/topLongShortPositionRatio?symbol=WLDUSDT&period=1h&limit=1"; do
+            C=$(curl -s -o /tmp/r.json -w "%{http_code}" --max-time 15 "https://fapi.binance.com/$EP")
+            echo "HTTP $C  <- $EP"
+            [ "$C" != "200" ] && head -c 200 /tmp/r.json && echo
+          done
