@@ -406,7 +406,18 @@ function decDeTick(t){
   return d<0 ? 0 : s.length-d-1;
 }
 const f = x => { if(x==null||!isFinite(x)) return "—";
-  if(TICK>0){ const dec=Math.max(0, Math.min(8, decDeTick(TICK)));
+  if(TICK>0){
+    const dt=decDeTick(TICK);
+    // Los precios que SÍ están en la rejilla del tick (entrada, stop, objetivos)
+    // se imprimen con los decimales exactos del tick: ni un cero de sobra.
+    // Pero hay números que NO tienen por qué caer en la rejilla — el precio del
+    // índice, por ejemplo — y a esos no se les puede recortar un dígito real.
+    // Así que si el número necesita más decimales para escribirse tal cual, se le
+    // dan (hasta dos más), y si no, se queda con los del tick.
+    const s=x.toFixed(8).replace(/0+$/,"");
+    const i=s.indexOf(".");
+    const dn=i<0?0:s.length-i-1;
+    const dec=Math.max(0, Math.min(8, Math.max(dt, Math.min(dn, dt+2))));
     return x.toFixed(dec); }
   return Math.abs(x)>=1 ? x.toFixed(4) : x.toPrecision(5); };
 const q = (x,p) => p ? Math.round(x/p)*p : x;
@@ -1176,11 +1187,12 @@ function render(D, eq, estilo, E, sym, marUsr, levUsr){
   }
 
   H.push(`<div class="card"><h2>Lo que esto NO sabe</h2>
-    <div class="sub">· pérdidas de hoy/semana (2 seguidas → 0.75%; 4 o −6R → stop al día)</div>
     <div class="sub">· si existe plan W1 y si este par está en la watchlist de hoy</div>
     <div class="sub">· posiciones abiertas correlacionadas (tope agregado 3%)</div>
     <div class="sub">· tu estado mental — puntos 8, 9 y 10 del checklist</div>
-    <div class="sub" style="margin-top:5px;color:var(--dim)">Esos gates los pones tú.</div></div>`);
+    <div class="sub" style="margin-top:5px;color:var(--dim)">Esos gates los pones tú.
+      Las pérdidas del día, la racha y el tope de −6× SÍ los sabe ahora: están arriba,
+      en <b>Tu día</b> — pero solo si vas marcando cada cierre.</div></div>`);
 
   // symFull/marUsr/levUsr se guardan para que repintar() pueda redibujar tras
   // marcar un cierre sin volver a consultar Binance
