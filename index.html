@@ -207,8 +207,22 @@ function agrupa(v, ms){
 // llegue a ejecutarse.
 const MARGEN_MAX = 250, LEV_MAX_USR = 75;
 // Evento calendarizado (SKILL.md): sizing -50% en ventana, sin abrir +-30min
-const EVENTOS = {WLD:{n:"unlock WLD 24-jul 11:00 CST (baja de TASA -43%, NO cliff)",
-  ini:Date.UTC(2026,6,23,6), fin:Date.UTC(2026,6,26,6), ts:Date.UTC(2026,6,24,17)}};
+// ── EVENTOS CALENDARIZADOS ──
+// Vacío A PROPÓSITO, no por olvido. Verificado el 28-jul-2026 en la fuente primaria
+// (world.org) y en DefiLlama: WLD NO tiene unlocks de cliff. Los tokens se liberan
+// a diario de forma lineal, sin saltos. Lo del 24-jul-2026 no fue un unlock: fue una
+// BAJA del 43% en la TASA diaria de emisión (comunidad de 3.2M a 1.6M WLD/día,
+// equipo e inversores de 1.9M a 1.3M), y ya pasó. No hay ninguna otra fecha anunciada
+// hasta el tramo final, alrededor de julio de 2038.
+//
+// O sea: para WLD no existe una fecha que justifique recortar el tamaño. Dejar aquí
+// la ventana vieja era peor que dejarlo vacío — parecía cubierto y no cubría nada.
+//
+// El mecanismo SIGUE VIVO para lo que sí tiene fecha: dato macro, decisión de la Fed,
+// listado, hard fork. Para activarlo:
+//   WLD:{n:"qué es", ini:Date.UTC(a,m-1,d,h), fin:..., ts:momento exacto}
+// Dentro de [ini,fin] el tamaño se recorta a la mitad; a ±30 min de `ts` no se abre.
+const EVENTOS = {};
 const MONEDAS = ["WLD","BTC","ETH","SOL","FET","GMT","1000SHIB","1000FLOKI","GALA"];
 
 const $ = s => document.querySelector(s);
@@ -389,8 +403,35 @@ const PRIO_TF = {"1m":["Mean-Reversion","Momentum-NY-Open","FVG-entrada"],
 let TICK=null, STEP=null, MINNOT=5;
 // Formatea SOBRE EL TICK real: redondear a 0.1 todo precio >=1000 mostraba
 // niveles NO ejecutables (SOL tiene tick 0.01). Sin tick conocido, cae a algo seguro.
+// Decimales EXACTOS que hacen falta para escribir el tick. Por logaritmos fallaba
+// por los dos lados: el "+0.001" daba un decimal de más en los ticks que son
+// potencia de 10 (0.0001 → 5 decimales, y un precio con un cero de sobra se lee
+// como si no estuviera en la rejilla en la que puedes poner la orden), y un ceil
+// pelón se queda corto con mantisa 2.5 (tick 0.25 → 1 decimal, que redondearía
+// 1.25 a "1.3", un precio que Binance no acepta). Contar los decimales de la
+// representación decimal del número no falla en ningún caso.
+function decDeTick(t){
+  if(!(t>0)) return null;
+  const s=String(t);
+  const e=s.match(/e-(\d+)$/i);                       // 1e-8, 2.5e-7…
+  if(e){ const m=s.split(/e-/i)[0], d=m.indexOf(".");
+    return +e[1] + (d<0?0:m.length-d-1); }
+  const d=s.indexOf(".");
+  return d<0 ? 0 : s.length-d-1;
+}
 const f = x => { if(x==null||!isFinite(x)) return "—";
-  if(TICK>0){ const dec=Math.max(0, Math.min(8, Math.ceil(-Math.log10(TICK)+0.001)));
+  if(TICK>0){
+    const dt=decDeTick(TICK);
+    // Los precios que SÍ están en la rejilla del tick (entrada, stop, objetivos)
+    // se imprimen con los decimales exactos del tick: ni un cero de sobra.
+    // Pero hay números que NO tienen por qué caer en la rejilla — el precio del
+    // índice, por ejemplo — y a esos no se les puede recortar un dígito real.
+    // Así que si el número necesita más decimales para escribirse tal cual, se le
+    // dan (hasta dos más), y si no, se queda con los del tick.
+    const s=x.toFixed(8).replace(/0+$/,"");
+    const i=s.indexOf(".");
+    const dn=i<0?0:s.length-i-1;
+    const dec=Math.max(0, Math.min(8, Math.max(dt, Math.min(dn, dt+2))));
     return x.toFixed(dec); }
   return Math.abs(x)>=1 ? x.toFixed(4) : x.toPrecision(5); };
 const q = (x,p) => p ? Math.round(x/p)*p : x;
@@ -579,6 +620,11 @@ async function correr(){
       Si es 418/429, tu IP está momentáneamente limitada — espera unos minutos.</span></div>`;
     return;
   }
+  // Hora en que los DATOS salieron de Binance. Va en el objeto D, no en render(),
+  // porque repintar() vuelve a dibujar con el MISMO D y si el sello se pusiera en
+  // render() el bloque que le pegas a Claude juraría que las velas son de ahora
+  // mismo cuando en realidad pueden ser de hace un buen rato.
+  D.__ts = Date.now();
   render(D, eq, estilo, E, sym, marUsr, levUsr);
 }
 
@@ -655,7 +701,52 @@ function render(D, eq, estilo, E, sym, marUsr, levUsr){
   const vArr=Object.values(tfVista);
   const netoVista=vArr.length?vArr.reduce((a,b)=>a+b,0)/vArr.length:null;
 
+  // ── quién manda: el mismo dato, pero pesado ──
+  // El conteo "N arriba / M abajo" trata a 1m igual que a 1M, y eso es justo lo que
+  // hacía que no se entendiera hacia dónde va todo: siete temporalidades cortas
+  // pueden voltear el resumen mientras el diario y el semanal siguen firmes en la
+  // otra dirección. Aquí cada temporalidad pesa lo que dura. Es la MISMA lectura
+  // de siempre (precio contra su EMA20), solo que ponderada.
+  const PESO_VISTA={"1M":6,"1w":5,"1d":4,"12h":3,"8h":3,"4h":3,"3h":2,"2h":2,"1h":2,
+                    "45m":1,"30m":1,"15m":1,"5m":.5,"3m":.5,"1m":.5};
+  let sesgo=null;
+  {
+    let num=0, den=0;
+    for(const [t,s] of Object.entries(tfVista)){ const w=PESO_VISTA[t]||1; num+=w*s; den+=w; }
+    if(den){
+      const score=Math.round(num/den*100), abs=Math.abs(score);
+      const dir=score>0?"long":"short";
+      const manda = abs>=45 ? "clara" : abs>=20 ? "leve" : "ninguna";
+      // El nivel que rompe la lectura. Tiene que estar DEL LADO CORRECTO del precio:
+      // el último suelo por DEBAJO (si manda la alza) o el último techo por ENCIMA
+      // (si manda la baja). Tomar el último pivote por índice sin más ponía a veces
+      // un "suelo" que el precio ya había perdido, y la tarjeta lo presentaba como
+      // colchón disponible cuando la lectura ya estaba rota.
+      let inval=null, invalTf=null;
+      for(const t of ["4h","1h"]){
+        const cr=D.v[t]; if(!cr||cr.length<40) continue;
+        const [hh,ll]=swings(cerradas(cr).slice(0,-1),3);
+        const cand=(dir==="long"?ll:hh).map(x=>x[1])
+          .filter(x=>dir==="long" ? x<D.mark : x>D.mark);
+        if(cand.length){
+          inval = dir==="long" ? Math.max(...cand) : Math.min(...cand);
+          invalTf=t; break; }
+      }
+      // ¿las grandes y las chicas dicen lo mismo?
+      const grandes=["1M","1w","1d","12h","8h","4h"].filter(t=>tfVista[t]!=null);
+      const chicas =["1h","45m","30m","15m","5m","3m","1m"].filter(t=>tfVista[t]!=null);
+      const prom = arr => arr.length ? arr.reduce((a,t)=>a+tfVista[t],0)/arr.length : null;
+      sesgo={score, abs, dir, manda, inval, invalTf,
+             pGrandes:prom(grandes), pChicas:prom(chicas)};
+    }
+  }
+
   let H=[];
+  // Lo que antes vivía en "lo que esto NO sabe" y te tocaba a ti. Tus datos dicen
+  // que es justo donde se pierde el dinero, así que ahora lo sabe. Solo aparece si
+  // hay algo que decir: si vas limpio no te roba la pantalla.
+  H.push(alertasDeRiesgo(now));
+
   // ═══ VEREDICTO ═══
   let bloqueos=[], avisos=[], plan=null, calidad=null, calidadDet=null;
 
@@ -768,6 +859,31 @@ function render(D, eq, estilo, E, sym, marUsr, levUsr){
     const aFavor = G ? (G.d==="long"?netoVista:-netoVista)>0 : null;
     const aFavorNota = G ? (G.d==="long"?netoTF:-netoTF)>0 : null;
     H.push(`<div class="card"><h2>Hacia dónde apunta cada temporalidad</h2>
+      ${sesgo?(()=>{
+        const col = sesgo.manda==="ninguna" ? "var(--dim)" : (sesgo.dir==="long"?"var(--ok)":"var(--no)");
+        const txt = sesgo.manda==="ninguna" ? "SIN RUMBO CLARO"
+                  : (sesgo.dir==="long"?"MANDA LA ALZA":"MANDA LA BAJA") + (sesgo.manda==="leve"?", pero poco":"");
+        const ancho=Math.min(50,sesgo.abs/2), izq=sesgo.score>=0?50:50-ancho;
+        const desacuerdo = sesgo.pGrandes!=null && sesgo.pChicas!=null
+          && Math.sign(sesgo.pGrandes)!==Math.sign(sesgo.pChicas)
+          && sesgo.pGrandes!==0 && sesgo.pChicas!==0;
+        return `<div style="font-size:26px;font-weight:800;letter-spacing:-.8px;color:${col};line-height:1.1">${txt}</div>
+        <div class="sub" style="margin-top:3px">fuerza ${sesgo.abs} de 100 · pesando cada temporalidad
+          por lo que dura, no contándolas todas igual</div>
+        <div style="height:7px;border-radius:4px;background:var(--card2);margin:9px 0 2px;position:relative;overflow:hidden">
+          <i style="position:absolute;top:0;bottom:0;left:${izq}%;width:${ancho}%;border-radius:4px;background:${col}"></i>
+          <span style="position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--dim2);opacity:.5"></span>
+        </div>
+        ${desacuerdo?`<div class="sub wa" style="margin-top:5px">Ojo: las temporalidades largas van
+          <b>${sesgo.pGrandes>0?"hacia arriba":"hacia abajo"}</b> y las cortas
+          <b>${sesgo.pChicas>0?"hacia arriba":"hacia abajo"}</b>. Cuando pasa esto, lo de las cortas
+          suele ser un respiro dentro de lo de las largas, no un cambio de rumbo.</div>`:""}
+        ${(sesgo.inval!=null && sesgo.manda!=="ninguna")?`<div class="sub" style="margin-top:5px">Esta
+          lectura se rompe si ${sesgo.dir==="long"?"pierde":"recupera"} <b>${f(sesgo.inval)}</b> — el
+          ${sesgo.dir==="long"?"suelo":"techo"} de ${sesgo.invalTf} más cercano
+          ${sesgo.dir==="long"?"por debajo":"por encima"} del precio, a
+          ${(Math.abs(D.mark-sesgo.inval)/D.mark*100).toFixed(2)}% de aquí.</div>`:""}`;
+      })():""}
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">${chips}</div>
       ${kv("resumen", `<b class="${netoVista>0?'up':netoVista<0?'dn':'nd'}">${arriba} arriba / ${abajo} abajo</b>`,
         `${lado} · verde = el precio va sobre su promedio de 20 velas de esa temporalidad`)}
@@ -802,28 +918,54 @@ function render(D, eq, estilo, E, sym, marUsr, levUsr){
       ${kv("entras en", `<b>${f(p.entry)}</b> <span class="pill">${p.tipo}</span>`)}
       ${kv("te sales si llega a", `<b class="dn">${f(p.stop)}</b>`,
         `es ${p.stopPct.toFixed(2)}% del precio — el movimiento típico de una vela de ${G.tf} es ${p.atrPct.toFixed(2)}%`)}`;
-    if(p.tps&&p.tps.length){
-      planHtml += p.tps.map(t=>kv(`cobras en ${t.tag}`, `${f(t.px)} <span class="${t.rn>=(p.rrMin||E.rr)?'up':'wa'}">${t.rn.toFixed(2)}×</span>`,
-        `ganas ${t.rn.toFixed(2)} veces lo que arriesgas · llegaría en ~${t.etaH<1?Math.round(t.etaH*60)+" min":t.etaH.toFixed(1)+" h"}${
-          t.set?` · pagas funding ${t.set} vez(ces) en el camino`:""}`)).join("")
-        + `<div class="sub" style="margin-top:6px">Los objetivos salen de ${p.fuente}. El número
-           "×" ya trae descontadas las comisiones, el deslizamiento y el funding.</div>`;
+    if(p.tps&&p.tps.length&&p.be!=null){
+      const R=p.riesgoUsd||0;
+      planHtml += `<div style="margin-top:10px;padding-top:9px;border-top:1px dashed var(--line)">
+        <div class="sub" style="margin-bottom:6px;letter-spacing:.5px">CÓMO SALES — POR PARTES, NO DE GOLPE</div>
+        ${p.tps.map(t=>kv(
+          `<b>${Math.round(t.frac*100)}%</b> en ${f(t.px)}`,
+          `<span class="${t.rn>=1?'up':t.rn>0?'wa':'dn'}">${t.rn>=0?"+":""}${t.rn.toFixed(2)}×</span>`,
+          `${t.nota} · te llevas ${(R*t.rn*t.frac).toFixed(2)} USDT de este tramo · llegaría en ~${
+            t.etaH<1?Math.round(t.etaH*60)+" min":t.etaH.toFixed(1)+" h"}${
+            t.set?` · pagas funding ${t.set} vez(ces) en el camino`:""}`)).join("")}
+        ${kv(`subes el stop a`, `<b class="ac">${f(p.be)}</b>`,
+          `en cuanto toque el primer objetivo — y a ESE precio, no a tu entrada: ahí ya cubres
+           comisiones y deslizamiento, así que la operación deja de poder hacerte daño`)}
+        ${kv(`el stop persigue a`, `<b class="ac">${p.trailPct.toFixed(2)}%</b>`,
+          `después del segundo objetivo, el stop va siguiendo al ${G.d==="long"?"máximo":"mínimo"}
+           ${G.d==="long"?"menos":"más"} ${f(p.trail)} y se recalcula en cada vela — no es un nivel fijo.
+           <b>Nunca ${G.d==="long"?"por debajo":"por encima"} de ${f(p.be)}</b>: una vez que subiste el stop,
+           no vuelve a bajar${p.trailAcotado?` (por eso esta distancia va recortada: 2.5 velas típicas
+           te habrían mandado por detrás del break-even)`:""}`)}
+      </div>
+      <div style="margin-top:10px;padding-top:9px;border-top:1px dashed var(--line)">
+        <div class="sub" style="margin-bottom:5px;letter-spacing:.5px">QUÉ TE DEJA CADA ESCENARIO</div>
+        ${kv("toca el primero y se devuelve", `<span class="${p.rMin>=0?'up':'dn'}">${p.rMin>=0?"+":""}${p.rMin.toFixed(2)}×</span>`,
+          `${(R*p.rMin).toFixed(2)} USDT — antes esto era cero o pérdida`)}
+        ${kv("llega al segundo", `<span class="${p.rMed>=0?'up':'dn'}">${p.rMed>=0?"+":""}${p.rMed.toFixed(2)}×</span>`,
+          `${(R*p.rMed).toFixed(2)} USDT`)}
+        ${kv("la escalera completa", `<span class="${p.rMax>=0?'up':'dn'}">${p.rMax>=0?"+":""}${p.rMax.toFixed(2)}×</span>`,
+          `${(R*p.rMax).toFixed(2)} USDT${p.rrMin?` · tu regla de ${estilo} pide ${p.rrMin}×${p.rMax>=p.rrMin?" — cumple":" — no llega"}`:""}`)}
+        ${kv("si te pega el stop", `<b class="dn">−${p.perdida.toFixed(2)}×</b>`,
+          `pierdes ${(R*p.perdida).toFixed(2)} USDT: los ${R.toFixed(2)} del stop más ${(R*p.friR2).toFixed(2)} de comisiones y deslizamiento — perder también cuesta entrar y salir`)}
+      </div>
+      <div class="sub" style="margin-top:6px">Los objetivos salen de ${p.fuente}. El número
+        "×" ya trae descontadas las comisiones, el deslizamiento y el funding.</div>`;
     } else {
       planHtml += `<div class="sub wa">sin objetivos calculados — mira el motivo arriba</div>`;
     }
-    if(p.tps&&p.tps.length&&p.riesgoUsd){
-      // RRM = el R:R que REALMENTE aplica. En scalp depende de la nota
-      // (SKILL.md:77), y esta tarjeta vive fuera del bloque donde se calculó,
-      // así que el plan lo trae consigo.
-      const t1=p.tps[0], RRM=p.rrMin||E.rr;
-      planHtml += cruce(`Si el precio llega a tu stop pierdes <b class="dn">${p.riesgoUsd.toFixed(2)} USDT</b>.
-        Si llega al primer objetivo ganas <b class="up">${(p.riesgoUsd*t1.rn).toFixed(2)} USDT</b>.
-        O sea: arriesgas 1 para ganar ${t1.rn.toFixed(2)}${
-        t1.rn>=RRM?`, y tu regla de ${estilo} pide al menos ${RRM}× — cumple.`
-                  :`, pero tu regla de ${estilo} pide al menos ${RRM}×. Tu skill dice
-                     advertir y pedir confirmación, no bloquear: el plan es ejecutable
-                     y la decisión es tuya.`}`,
-        t1.rn>=RRM?"ok":"ojo");
+    if(p.tps&&p.tps.length&&p.riesgoUsd&&p.esperanza!=null){
+      const R=p.riesgoUsd, gana=p.esperanza>0;
+      planHtml += cruce(`De cada 100 operaciones aciertas 55 — eso ya lo haces bien y no es lo que
+        hay que arreglar. Con esta forma de salir, esas 100 operaciones te dejan
+        <b class="${gana?'up':'dn'}">${p.esperanza>=0?"+":""}${p.esperanza.toFixed(3)}×</b> de promedio
+        cada una, o sea ${(R*p.esperanza).toFixed(2)} USDT por operación.
+        <br><br>Pero eso vale <b>solo si respetas el stop</b>. En junio-julio tu pérdida media fue de
+        <b class="dn">1.69 veces</b> lo que decías arriesgar, no 1.00. Con esa pérdida media, las mismas
+        100 operaciones te dejan <b class="dn">${p.esperanzaSinStop.toFixed(3)}×</b> cada una —
+        ${(R*p.esperanzaSinStop).toFixed(2)} USDT. La diferencia entre las dos líneas no la pone la app:
+        la pones tú cuando el precio va en contra y decides si mueves el stop o no.`,
+        gana?"ok":"ojo");
     }
     H.push(planHtml+`</div>`);
 
@@ -893,6 +1035,9 @@ function render(D, eq, estilo, E, sym, marUsr, levUsr){
     }
     if(avisos.length) H.push(`<div class="card">${avisos.map(a=>`<div class="wa" style="font-size:12.5px">⚠ ${a}</div>`).join("")}</div>`);
   }
+
+  // ── TU DÍA ── (marcador: útil pero no urgente, por eso va después del plan)
+  H.push(tarjetaSesion(now));
 
   // ── MERCADO ──
   const fTier = contra8===null?"":(Math.abs(contra8)<=FUND_OK?"up":Math.abs(contra8)<=FUND_NO?"wa":"dn");
@@ -1056,14 +1201,17 @@ function render(D, eq, estilo, E, sym, marUsr, levUsr){
   }
 
   H.push(`<div class="card"><h2>Lo que esto NO sabe</h2>
-    <div class="sub">· pérdidas de hoy/semana (2 seguidas → 0.75%; 4 o −6R → stop al día)</div>
     <div class="sub">· si existe plan W1 y si este par está en la watchlist de hoy</div>
     <div class="sub">· posiciones abiertas correlacionadas (tope agregado 3%)</div>
     <div class="sub">· tu estado mental — puntos 8, 9 y 10 del checklist</div>
-    <div class="sub" style="margin-top:5px;color:var(--dim)">Esos gates los pones tú.</div></div>`);
+    <div class="sub" style="margin-top:5px;color:var(--dim)">Esos gates los pones tú.
+      Las pérdidas del día, la racha y el tope de −6× SÍ los sabe ahora: están arriba,
+      en <b>Tu día</b> — pero solo si vas marcando cada cierre.</div></div>`);
 
+  // symFull/marUsr/levUsr se guardan para que repintar() pueda redibujar tras
+  // marcar un cierre sin volver a consultar Binance
   LAST={D,G,plan,setups,tier,estilo,eq,riesgo,ses,bloq:bloqueos,evOn,
-        sym:base, ts:Date.now(), calidad};
+        sym:base, symFull:sym, marUsr, levUsr, ts:(D.__ts||Date.now()), calidad};
 
   // ── aviso: solo en TRANSICIÓN a operable, nunca repetido ──
   const verAhora = !G ? "sin-setup" : (bloqueos.length ? "bloqueado" : "OPERAR");
@@ -1113,7 +1261,8 @@ function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8,marUsr,levUsr)
 
   const stopPct=Math.abs(entry-stop)/entry, rU=Math.abs(entry-stop);
   const ticks=rU/TICK;
-  p.entry=entry; p.stop=stop; p.stopPct=stopPct*100; p.atrPct=a/mk*100; p.ticks=ticks; p.tipo=tipo;
+  p.entry=entry; p.stop=stop; p.stopPct=stopPct*100; p.atrPct=a/mk*100; p.atrAbs=a;
+  p.stopATR=rU/a; p.ticks=ticks; p.tipo=tipo;
   // 1 decimal: con toFixed(0) un stop de 19.6 ticks se leía "20 ticks (mínimo 20)",
   // que parece una contradicción y hace desconfiar de la herramienta
   if(TICK/a > TICK_ATR_MAX){ p.bloq.push(`el tick (${TICK}) es el ${(TICK/a*100).toFixed(0)}% del ATR de ${G.tf}: este símbolo no puede expresar un stop con precisión en este TF`); return p; }
@@ -1215,52 +1364,133 @@ function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8,marUsr,levUsr)
     if(p.margen>MARGEN_MAX) p.avisos.push(`al bajar a ${lev}x para respetar el colchón, el margen sube a ${p.margen.toFixed(0)} USDT y pasa tu tope de ${MARGEN_MAX}`);
   }
 
-  // fricción MEDIDA del libro (x2 de protocolo-sizing paso 7)
+  // fricción MEDIDA del libro
   const [slip,cub]=slipLibro(D.libro,notReal,dir);
   if(!cub){ p.bloq.push(`los 50 niveles del libro no cubren ${notReal.toFixed(0)} USDT: no operable a este tamaño`); return p; }
   const feesPct = tipo==="limit en zona"?0.07:0.10;
   const friPct=feesPct+slip/100*(tipo==="limit en zona"?1:2);
-  const friUsd=notReal*friPct/100*2;
-  p.slip=slip; p.friPct=friPct;
+  // friPct YA es entrar Y salir (0.10% = taker 0.05 dos veces; 0.07% = maker + taker,
+  // y el deslizamiento trae su propio ×1/×2 según se cruce el spread una o dos veces).
+  //   friReal = lo que de verdad cuesta la ida y vuelta → es lo que tiene que cubrir
+  //             el break-even, o la etiqueta mentiría.
+  //   friUsd  = ese mismo costo con el ×2 conservador del protocolo-sizing paso 7,
+  //             que es el que castiga los "×" para no cantar victoria antes de tiempo.
+  const friReal=notReal*friPct/100;
+  const friUsd=friReal*2;
+  // OJO: notReal y riesgoUsd son de ANTES del recorte por MARGEN_MAX. Para los
+  // mensajes hay que usar los valores finales o las cifras en USDT mienten (el
+  // porcentaje no cambia, porque los dos lados escalan igual, pero los USDT sí).
+  const notFin=p.notional, rFin=p.riesgoUsd, friFin=notFin*friPct/100;
+  p.slip=slip; p.friPct=friPct; p.friUsd=friUsd; p.friR=friFin/rFin;
+  // friR2 = la fricción en la MISMA moneda que los "×": con el ×2 conservador.
+  // Se usa para la pata perdedora, que también paga comisiones: cobrarle fricción
+  // solo a los ganadores inclinaba la esperanza al lado optimista siempre.
+  p.friR2=(friFin*2)/rFin;
+  p.perdida = 1 + p.friR2;       // lo que cuesta DE VERDAD que te pegue el stop
+  // Si entrar y salir se lleva más de un tercio de lo que arriesgas, el trade nace
+  // peleado con sus propios costos. Pero esto AVISA, no veta: main quitó a propósito
+  // los bloqueos duros de este tipo porque mataban casi todo el scalp de stop ceñido,
+  // y volver a meterlos por la puerta de atrás sería deshacer esa decisión.
+  // Duro solo en el extremo donde ni el primer objetivo sale positivo.
+  if(p.friR2>=1){ p.bloq.push(`entrar y salir cuesta ${(friFin*2).toFixed(2)} USDT y solo arriesgas ${rFin.toFixed(2)}: ni llegando al primer objetivo sales positivo`); return p; }
+  if(p.friR>0.33) p.blandos.push(`entrar y salir te cuesta ${friFin.toFixed(2)} USDT y arriesgas ${rFin.toFixed(2)}: son el <b>${(p.friR*100).toFixed(0)}%</b> de tu riesgo. Con un stop tan ceñido las comisiones se llevan buena parte del trade — no es un veto, pero el objetivo tiene que dar bastante más de lo normal para compensarlo`);
 
-  // TPs desde ESTRUCTURA con tope 8·ATR
+  // ═══════════════ CÓMO SE SALE — escalonado, no de golpe ═══════════════
+  // Tu historial real de Binance (206 cierres, 14-jun a 10-jul) dice que las
+  // entradas están bien: aciertas el 55.3%. Lo que vacía la cuenta es la SALIDA.
+  // Cobrabas +0.67 veces lo que arriesgabas y aguantabas −1.69. Con eso, acertar
+  // más de la mitad de las veces igual da pérdida. Nueve pérdidas pasaron de 5×
+  // y la peor fue −27.4×: ahí no hubo stop.
+  //
+  // Antes los objetivos salían SOLO de estructura, y si no aparecían dos niveles
+  // el trade se bloqueaba entero ("no se inventan objetivos"). Suena prudente,
+  // pero en la práctica te dejaba sin plan de salida escrito y salías a ojo —
+  // que es exactamente de donde venían esas pérdidas gigantes.
+  //
+  // Ahora la salida siempre existe y siempre es asimétrica:
+  //   · el primer objetivo está a 1× exacto  → cobras el 40% y subes el stop
+  //   · el segundo, en estructura desde 1.8× → cobras el 35%
+  //   · el resto (25%) lo dejas correr con un stop que persigue al precio
+  // La consecuencia importante: una operación que te da la razón, toca el primer
+  // objetivo y se devuelve, ya NO acaba en cero. Acaba en +0.40. Ahí está la
+  // diferencia entre tu 0.49 de profit factor y un número por encima de 1.
   const v=cerradas(D.v[G.tf]); const [hi,lo]=swings(v);
   const TOPE=8*a, sep=Math.max(0.5*rU,0.5*a);
-  // filtrar por tope ANTES de deduplicar (como el Python): al reves, un nivel
-  // lejano podia "consumir" la separacion y dejar fuera uno valido cercano,
-  // haciendo escalar a TF superior donde el Python bloquea
-  let objs=[...new Set((dir==="long"?hi:lo).map(x=>x[1])
+  const niveles=[...new Set((dir==="long"?hi:lo).map(x=>x[1])
     .filter(x=>(x-entry)*sg>rU*0.5 && Math.abs(x-entry)<=TOPE))]
     .sort((x,y)=>dir==="long"?x-y:y-x)
     .reduce((acc,x)=>{ if(!acc.length||Math.abs(x-acc[acc.length-1])>=sep) acc.push(x); return acc; },[]);
-  let fuente=`estructura ${G.tf}`;
-  if(objs.length<2){
-    const esc=["1m","5m","15m","1h","4h","1d"], i=esc.indexOf(G.tf);
-    const sup=esc[i+1];
-    if(sup&&D.v[sup]&&D.v[sup].length>40){
-      const vs=cerradas(D.v[sup]), as=atr(vs), [h2,l2]=swings(vs);
-      const sp2=Math.max(0.5*rU,0.5*(as||a));
-      const o2=[...new Set((dir==="long"?h2:l2).map(x=>x[1])
-        .filter(x=>(x-entry)*sg>rU*0.5 && Math.abs(x-entry)<=TOPE))]
-        .sort((x,y)=>dir==="long"?x-y:y-x)
-        .reduce((acc,x)=>{ if(!acc.length||Math.abs(x-acc[acc.length-1])>=sp2) acc.push(x); return acc; },[]);
-      if(o2.length>=2){ objs=o2; fuente=`estructura ${sup} (el ${G.tf} no tenía)`; } } }
-  if(objs.length<2){ p.bloq.push("sin estructura por delante dentro de 8 ATR para fijar TP — no se inventan objetivos"); return p; }
-  p.fuente=fuente;
 
-  p.tps=[];
-  objs.slice(0,3).forEach((o,i)=>{
-    const px=q(o,TICK); if(px<=0||px===entry) return;
-    const dist=Math.abs(px-entry), rb=dist/rU;
-    const etaH=dist/(0.6*a)*tfH(G.tf);
-    let set=0, cf=0;
-    if(contra!=null){ let rest=D.fundNext/60;
-      while(rest<=etaH && set<24){ set++; rest+=D.ivH; }
-      cf=notReal*(contra/100)*set; }
-    const rn=rb-(friUsd+Math.max(0,cf))/riesgoUsd;
-    p.tps.push({tag:`TP${p.tps.length+1}`,px,rb,rn,etaH,set});
-  });
-  if(p.tps.length<2){ p.bloq.push("los objetivos colapsan al cuantizar al tick"); return p; }
+  const etaDe = z => Math.abs(z-entry)/(0.6*a)*tfH(G.tf);
+  const fundingEn = eta => { if(contra==null) return [0,0];
+    let set=0, rest=D.fundNext/60;
+    while(rest<=eta && set<24){ set++; rest+=D.ivH; }
+    return [notReal*(contra/100)*set, set]; };
+  const armar = (z,frac,tag,nota) => {
+    const px=q(z,TICK), eta=etaDe(px), [cf,set]=fundingEn(eta);
+    const rb=Math.abs(px-entry)/rU;
+    return {tag,px,frac,rb,rn:rb-(friUsd+Math.max(0,cf))/riesgoUsd,etaH:eta,set,nota};
+  };
+
+  // primer objetivo — 1× exacto. No se negocia y no depende de que el gráfico coopere.
+  const tp1=armar(entry+sg*rU, 0.40, "TP1", "cobras el 40% y subes el stop a que no pierdas");
+  // segundo — la primera estructura que valga entre 1.8× y 3.2×; si no hay, 2× limpio
+  const e2=niveles.find(x=>{const r=Math.abs(x-entry)/rU; return r>=1.8&&r<=3.2;});
+  const tp2=armar(e2!=null?e2:entry+sg*2*rU, 0.35, "TP2",
+    e2!=null?`cobras el 35% · sale de la estructura de ${G.tf}`:"cobras el 35% · son 2× exactos");
+  // el resto — sin objetivo fijo: lo cierra el stop que persigue, no un número.
+  // OJO: e2 y e3 podían caer en el MISMO nivel (una estructura a 3.05× entra en los
+  // dos rangos) y dejaban dos precios idénticos. Por eso se excluye e2 y se exige
+  // que el resto quede por delante del segundo objetivo.
+  // El tramo que corre se acota a [3×, 5×]. Sin tope superior, una estructura
+  // lejana dentro de los 8·ATR podía poner la referencia a 10× o más, y luego el
+  // modelo le asignaba un 28% de probabilidad: eso inflaba la escalera completa y
+  // la esperanza con un objetivo que casi nunca se toca.
+  const e3=niveles.find(x=>{const r=Math.abs(x-entry)/rU; return r>=3.0&&r<=5.0&&x!==e2;});
+  let px3 = e3!=null ? e3 : entry+sg*3.5*rU;
+  if((px3-tp2.px)*sg <= 0) px3 = entry+sg*3.5*rU;
+  const tp3=armar(px3, 0.25, "el resto",
+    (e3!=null&&px3===e3)?`lo dejas correr · referencia en la estructura de ${G.tf}`
+                        :"lo dejas correr · referencia en 3.5×, pero lo cierra el stop que persigue");
+
+  // Todos los campos ANTES de cualquier salida temprana: el render lee el objeto
+  // completo, y devolver p.tps a medias reventaba la pantalla.
+  const conEstr = (e2!=null) || (e3!=null && px3===e3);
+  p.fuente = conEstr ? `la estructura de ${G.tf} y múltiplos de lo que arriesgas`
+                     : "múltiplos de lo que arriesgas (no había estructura utilizable en el tramo)";
+  // el break-even de verdad no es tu entrada: es tu entrada más lo que costó entrar y salir
+  p.be    = q(entry + sg*(friReal/qty), TICK);
+  // DISTANCIA del stop que persigue, no un nivel. Se acota para que en el momento
+  // de activarse (justo tras el segundo objetivo) NO quede por detrás del break-even:
+  // con 2.5·ATR a secas y un stop menor de 1.25 ATR, el "stop que persigue" caía por
+  // DEBAJO del stop original — la app te decía que la operación ya no podía hacerte
+  // daño y acto seguido te mandaba a 3× en contra.
+  const trailTope = Math.abs(tp2.px - p.be);
+  p.trail = Math.max(TICK, Math.min(2.5*a, trailTope));
+  p.trailPct = p.trail/entry*100;
+  p.trailAcotado = p.trail < 2.5*a - 1e-12;
+  p.tps=[tp1,tp2,tp3];
+
+  // lo que vale esta escalera. El caso que importa no es el bonito: es el de la
+  // operación que te da la razón un rato y se devuelve.
+  // Los tramos no alcanzados salen en break-even = 0 neto, y eso es cierto PORQUE
+  // el stop que persigue está acotado para no bajar del break-even (arriba).
+  p.rMin  = 0.40*tp1.rn;                                 // solo el primero
+  p.rMed  = 0.40*tp1.rn + 0.35*tp2.rn;                   // hasta el segundo
+  p.rMax  = 0.40*tp1.rn + 0.35*tp2.rn + 0.25*tp3.rn;     // la escalera completa
+  // Esperanza. Cada tramo pesa por lo probable que es alcanzarlo: el primero
+  // siempre (está a 1× por construcción), el segundo poco más de la mitad de las
+  // veces, el resto una de cada cuatro. Lo que no se alcanza sale en break-even.
+  // Y la pata perdedora paga fricción igual que las ganadoras: es p.perdida, no 1.00.
+  p.rGanadora = 0.40*tp1.rn + 0.35*0.55*tp2.rn + 0.25*0.28*tp3.rn;
+  p.esperanza = 0.553*p.rGanadora - 0.447*p.perdida;    // respetando el stop
+  // El 1.69 sale de tu P&L REALIZADO, que ya viene con las comisiones descontadas:
+  // sumarle la fricción otra vez sería cobrártela dos veces.
+  p.esperanzaSinStop = 0.553*p.rGanadora - 0.447*1.69;
+  p.rrMin = E.rr;   // aquí arriba: hay un return temprano más abajo
+
+  if(new Set(p.tps.map(t=>t.px)).size<3){
+    p.bloq.push("dos de los tres objetivos caen en el mismo precio al ajustarlos al tick: el recorrido es demasiado corto para salir escalonado"); return p; }
 
   // Horizonte: AVISA, no bloquea. Que el objetivo tarde mas de lo que dura el
   // estilo no hace peligroso al trade — solo lo convierte en otro estilo. Antes
@@ -1280,27 +1510,26 @@ function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8,marUsr,levUsr)
   }
   if(contra8!==null&&contra8>FUND_NO) p.bloq.push(`funding ${contra8.toFixed(4)}% base-8h PROHIBITIVO contra el trade`);
   else if(contra8!==null&&contra8>FUND_OK) p.avisos.push(`funding ${contra8.toFixed(4)}% base-8h ALERTA: no mantener más de 4h`);
-  // salta-TP1 (checklist-pre-trade.md:49-50). El umbral era TP2>=3.0R fijo, heredado
-  // de la redacción "T2 muy holgado (>3R)" del checklist. Emmanuel autorizó bajarlo al
-  // mínimo del estilo (2.0 intraday / 1.3 scalp): si el objetivo al que REALMENTE se
-  // opera cumple el R:R, el trade cumple el R:R. TP1 solo era el peldaño intermedio.
-  // El R:R por debajo del mínimo NO veta. SKILL.md:78 es explícito: "Si el setup
-  // propuesto no cumple R:R mínimo del estilo elegido, ADVERTIR Y PEDIR
-  // CONFIRMACIÓN antes del W3". El código lo tenía como bloqueo duro, así que un
-  // trade con la nota suficiente salía NO OPERAR igual. Ahora va a p.blandos:
-  // el veredicto queda MARGINAL, el plan se muestra completo y decide Emmanuel.
-  p.rrMin = E.rr;
-  const SALTA_TP1_MIN = E.rr;
-  if(p.tps[0].rn<E.rr){
-    if(p.tps.length>1&&p.tps[1].rn>=SALTA_TP1_MIN){ const v1=p.tps.shift();
-      p.tps.forEach((t,j)=>t.tag=`TP${j+1}`);
-      p.avisos.push(`salta-TP1: el original daba ${v1.rn.toFixed(2)}R &lt; ${E.rr}; se opera directo a T2 con cierre 60/40`);
-      if(p.tps[0].rn<E.rr) p.blandos.push(`ni saltando TP1 se alcanza el mínimo (${p.tps[0].rn.toFixed(2)}× &lt; ${E.rr}×)`); }
-    else {
-      const t2=p.tps[1];
-      const nota = t2 ? ` — el segundo tampoco alcanza (${t2.rn.toFixed(2)}×)` : " y no hay un segundo objetivo";
-      p.blandos.push(`el primer objetivo solo da <b>${p.tps[0].rn.toFixed(2)}×</b> lo que arriesgas y tu regla de ${estilo} pide ${E.rr}×${nota} — tu skill dice advertir y pedir confirmación, no vetar`);
-    } }
+
+  // El R:R mínimo del estilo sigue vivo, pero hay que aplicarlo a algo COMPARABLE.
+  //   · el primer objetivo ya no puede cumplirlo: vale 1× por diseño, y esa es la idea
+  //   · el tramo que corre está a 3× o más por construcción: cumpliría siempre
+  //   · la escalera completa es un promedio ponderado por fracción de posición, con
+  //     techo ~1.98 por construcción — compararla con un umbral de 2.0 marcaría
+  //     TODO intraday como marginal, que es no decir nada
+  // Lo comparable es el objetivo PRINCIPAL: el segundo, donde sale el 75% de la
+  // posición. Ese es el "cuánto gano si el trade sale bien" de tu regla de toda la vida.
+  // Blando, como tú lo dejaste: advertir y pedir confirmación, no vetar.
+  // Se compara en BRUTO, que es como está escrita tu regla de toda la vida
+  // ("R:R 2:1"). El neto ya lo tienes tramo por tramo en la escalera, y meterlo
+  // aquí marcaría como marginal casi todo intraday por el simple hecho de que las
+  // comisiones existen — eso no es información, es ruido.
+  if(p.tps[1].rb<E.rr)
+    p.blandos.push(`el objetivo principal está a <b>${p.tps[1].rb.toFixed(2)}×</b> lo que arriesgas y tu regla de ${estilo} pide ${E.rr}× — no hay estructura por delante que dé para más`);
+  if(p.esperanza<=0)
+    p.blandos.push(`con tu 55.3% de acierto histórico este trade sale a <b>${p.esperanza.toFixed(3)}×</b> por operación aun respetando el stop — o el costo de entrar y salir es muy alto, o el recorrido es muy corto`);
+  if(p.tps[0].rn<0.80 && tipo==="mercado")
+    p.avisos.push(`entrar y salir se come el ${((1-p.tps[0].rn)*100).toFixed(0)}% del primer objetivo (queda ${p.tps[0].rn.toFixed(2)}× de 1× bruto): con orden límite en vez de a mercado te ahorras parte`);
   return p;
 }
 
@@ -1313,6 +1542,7 @@ function textoParaClaude(){
   if(!LAST) return "aún sin datos — pulsa Ver primero";
   const {D,G,plan,tier,estilo,eq,riesgo,ses,bloq,evOn}=LAST;
   const L=[];
+  const _s=resumenSesion(new Date());
   // simbolo y hora DE LOS DATOS (no el SYM global ni la hora de copiado):
   // si cambiaste de moneda a mitad de fetch, el rotulo mentiria
   L.push(`[PERP ${LAST.sym} · datos de ${new Date(LAST.ts).toLocaleString("es-MX")} · ${ses} · ${tier} · ${estilo} · equity ${eq} · riesgo ${riesgo}%]`);
@@ -1320,6 +1550,10 @@ function textoParaClaude(){
   L.push(`MERCADO mark ${f(D.mark)} · 24h ${pct(D.chg)} · vol ${(D.vol/1e6).toFixed(1)}M · basis ${((D.mark/D.index-1)*1e4).toFixed(1)}bps · spread ${((D.ask/D.bid-1)*1e4).toFixed(1)}bps`);
   L.push(`FUNDING ${D.fund>=0?"+":""}${D.fund.toFixed(4)}%/${D.ivH}h = ${(D.fund*8/D.ivH>=0?"+":"")}${(D.fund*8/D.ivH).toFixed(4)}% base-8h · próximo en ${D.fundNext.toFixed(0)}min`);
   L.push(`OI ${(D.oi/1e6).toFixed(1)}M${D.oiUsd?` (${(D.oiUsd/1e6).toFixed(1)}M USD, ${pct(D.oiChg)} 24h)`:""}`);
+  // el estado de sesión: lo único que Binance no le puede decir a nadie
+  if(_s.ops.length) L.push(`SESIÓN HOY ${_s.ops.length} cierres · ${_s.rTot>=0?"+":""}${_s.rTot.toFixed(1)}R acumulado · racha de pérdidas ${_s.racha}${
+    _s.ult&&_s.ult.r<0&&_s.mins<20?` · ÚLTIMA FUE PÉRDIDA hace ${_s.mins.toFixed(0)} min`:""}${
+    HORAS_ROJAS[_s.h]!=null?` · hora históricamente mala (${HORAS_ROJAS[_s.h]} USDT)`:""}`);
   L.push(`L/S retail ${D.ls.g.toFixed(4)} · topCUENTA ${D.ls.ta.toFixed(4)} · topPOSICIÓN ${D.ls.tp.toFixed(4)} · spread ${(D.ls.tp-D.ls.g>=0?"+":"")}${(D.ls.tp-D.ls.g).toFixed(4)} · taker ${D.taker.toFixed(3)} · edad ${D.lsEdad.toFixed(0)}min${D.lsEdad>90?" (VIEJA >90min, no cuenta)":""}`);
   const tf=[];
   for(const t of TF_VISTA){
@@ -1331,7 +1565,11 @@ function textoParaClaude(){
   L.push(`SETUPS AUTO: ${LAST.setups.length?LAST.setups.map(s=>`${s.s} ${s.d.toUpperCase()} en ${s.tf} (${s.n})`).join(" | "):"ninguno detectable — SEMI/MANUAL requieren marcar estructura"}`);
   if(plan&&plan.entry){
     L.push(`PLAN ${G.d.toUpperCase()} entrada ${f(plan.entry)} [${plan.tipo}] · stop ${f(plan.stop)} (${plan.stopPct.toFixed(3)}%, ${plan.ticks.toFixed(0)} ticks)`);
-    if(plan.tps&&plan.tps.length) L.push(`TP ${plan.tps.map(t=>`${t.tag} ${f(t.px)} ${t.rn.toFixed(2)}R neto (${t.rb.toFixed(2)} bruto, ETA ${t.etaH.toFixed(1)}h)`).join(" · ")} [${plan.fuente}]`);
+    if(plan.tps&&plan.tps.length){
+      L.push(`SALIDA ESCALONADA ${plan.tps.map(t=>`${t.tag} ${f(t.px)} cierra ${Math.round(t.frac*100)}% = ${t.rn.toFixed(2)}R neto (${t.rb.toFixed(2)} bruto, ETA ${t.etaH.toFixed(1)}h)`).join(" · ")} [${plan.fuente}]`);
+      if(plan.be!=null) L.push(`GESTIÓN break-even ${f(plan.be)} al tocar TP1 · trailing ${plan.trailPct.toFixed(2)}% (${f(plan.trail)}) para el resto tras TP2`);
+      if(plan.esperanza!=null) L.push(`VALOR solo-TP1 ${plan.rMin>=0?"+":""}${plan.rMin.toFixed(2)}R · hasta-TP2 ${plan.rMed>=0?"+":""}${plan.rMed.toFixed(2)}R · completa ${plan.rMax>=0?"+":""}${plan.rMax.toFixed(2)}R · esperanza ${plan.esperanza>=0?"+":""}${plan.esperanza.toFixed(3)}R con stop respetado / ${plan.esperanzaSinStop.toFixed(3)}R con su pérdida media histórica de 1.69R`);
+    }
     if(plan.qty) L.push(`SIZING ${plan.qty} ${SYM} · nocional ${plan.notional.toFixed(0)} · ${plan.lev}x (máx por stop ${plan.levStop.toFixed(1)}x, bracket ${plan.br.seq} MMR ${(plan.br.mmr*100).toFixed(3)}%) · margen ${plan.margen.toFixed(0)} · liq teórica ${plan.liq?f(plan.liq):"?"} colchón ${plan.colchon?plan.colchon.toFixed(1):"?"}% · fricción ${plan.friPct?plan.friPct.toFixed(3):"?"}%`);
     if(plan.cf) L.push(`CONFLUENCIAS ${plan.cf.map(c=>`${c[1]?"✓":"✗"} ${c[0]}`).join(" · ")}`);
     if(plan.avisos&&plan.avisos.length) L.push(`AVISOS ${plan.avisos.join(" · ")}`);
@@ -1402,6 +1640,133 @@ $("#al").onclick=toggleAvisos;
 // Linea de cierre de cada tarjeta: que significa ESTO para el trade de hoy.
 // Sin esto la app era un volcado de metricas que no se cruzaban entre si.
 const stopPctDe = p => (p.stopPct||0)/100;
+// ═══════ TU SESIÓN — lo único que la app no puede leer de Binance ═══════
+// De tu historial 14-jun → 10-jul (206 cierres):
+//   · la operación que va DESPUÉS de una pérdida te deja −37.80 USDT de promedio.
+//     Son 91 casos y −3,440 acumulados. La que va después de una ganancia te deja
+//     +14.61. El "revancha" no es una sensación tuya, está en el estado de cuenta.
+//   · por hora (CST): 23:00 −1,873 · 04:00 −627 · 21:00 −618 · 00:00 −220 · 07:00 −168,
+//     contra 19:00 +1,094 y 14:00 +634.
+//   · el NÚMERO de operaciones al día no predice nada: tus tres días verdes tuvieron
+//     37, 36 y 41 cierres, y los rojos 23, 30 y 21. Lo que predice es el TAMAÑO de la
+//     pérdida. Por eso lo que se cuenta aquí son "veces lo que arriesgas", no trades.
+// Nada de esto bloquea: avisa, con el número delante.
+const HORAS_ROJAS  = {23:-1873, 4:-627, 21:-618, 0:-220, 7:-168};
+const HORAS_VERDES = {19:1094, 14:634};
+
+// La jornada NO corta a medianoche: cortando a las 00:00 se borraban la racha y el
+// tope del día justo en mitad de tu peor bloque horario (23:00 −1,873 y 00:00 −220).
+// Corta a las 08:00 CST, que es el único punto que deja FUERA todas tus franjas
+// malas — 21:00, 23:00, 00:00, 04:00 y 07:00 caen dentro de la misma jornada, así
+// que una racha nocturna sigue contando por la mañana en vez de borrarse sola.
+// Coincide además con la apertura de Nueva York, que es cuando empieza de verdad
+// una sesión nueva para ti.
+const claveDia = t => "ses:" + new Date(t - 14*3600e3).toISOString().slice(0,10);
+
+function leerSesion(now){
+  let s=null;
+  try{ s=JSON.parse(localStorage.getItem(claveDia(now.getTime()))||"null"); }catch(e){}
+  // no basta con que el JSON parsee: si 'ops' no es una lista de números, cualquier
+  // cuenta de más abajo revienta el render entero y te deja la pantalla colgada
+  if(!s || !Array.isArray(s.ops)) return {ops:[]};
+  return {ops: s.ops.filter(o=>o && typeof o.r==="number" && isFinite(o.r)
+                                && typeof o.t==="number" && isFinite(o.t))};
+}
+function guardarSesion(s){
+  try{ localStorage.setItem(claveDia(Date.now()), JSON.stringify(s)); return true; }
+  catch(e){ alert("No se pudo guardar el registro: "+e.message
+    +"\n\nLos avisos de racha y del tope del día seguirán en cero hasta que se resuelva."); return false; }
+}
+// Repintar SIN volver a pegarle a Binance: el candado anti-solape vive en tick(),
+// así que llamar a correr() desde un botón podía lanzar dos corridas a la vez y
+// duplicar el consumo de rate-limit. Con LAST ya tenemos los datos.
+function repintar(){
+  if(LAST && LAST.D) render(LAST.D, LAST.eq, LAST.estilo, ESTILOS[LAST.estilo],
+                            LAST.symFull||(LAST.sym+"USDT"), LAST.marUsr, LAST.levUsr);
+  else tick(true);
+}
+function registrar(r){
+  const s=leerSesion(new Date());
+  s.ops.push({r, t:Date.now()});
+  if(guardarSesion(s)) repintar();
+}
+function borrarSesion(){
+  try{ localStorage.removeItem(claveDia(Date.now())); }catch(e){}
+  repintar();
+}
+function resumenSesion(now){
+  const ops=leerSesion(now).ops;
+  let rTot=0; ops.forEach(o=>rTot+=o.r);
+  let racha=0; for(let i=ops.length-1;i>=0;i--){ if(ops[i].r<0) racha++; else break; }
+  const ult=ops[ops.length-1];
+  return {ops, rTot, racha, ult, mins: ult ? (Date.now()-ult.t)/60000 : null,
+          h: cstH(now.getTime())};
+}
+function alertasDeRiesgo(now){
+  const {ops,rTot,racha,ult,mins,h}=resumenSesion(now);
+  const A=[];
+  if(ult && ult.r<0 && mins<20) A.push(["mal","⏸",
+    "Acabas de perder — no entres todavía",
+    `Han pasado ${mins.toFixed(0)} minutos. En tu historial, la operación que va justo
+     después de una pérdida te deja <b>−37.80 USDT</b> de promedio: 91 veces, −3,440 en total.
+     Es lo más caro que haces. Deja pasar 20 minutos como mínimo.`]);
+  // El tope del día es distinto de una racha: por eso tiene su propia tarjeta y no
+  // el mismo tono. Antes racha 2 y racha 5 se veían exactamente igual.
+  if(racha>=4 || rTot<=-6) A.push(["mal","⛔",
+    racha>=4 ? `${racha} pérdidas seguidas — según tu regla, hoy se acabó`
+             : `${rTot.toFixed(1)}× en el día — según tu regla, hoy se acabó`,
+    `Tu regla es explícita: <b>4 seguidas o −6× y se cierra el día</b>. No es un consejo de la app,
+     es lo que tú escribiste. El 6 de julio, sin este freno, el día terminó en
+     <b>−1,874 USDT</b>. Cierra la plataforma.`]);
+  // Toda la escalera del día es UNA sola cadena: si ya saltó el "se acabó", no puede
+  // salir debajo un "todavía no es el −3× que cierra el día" contradiciéndolo.
+  else if(racha>=2) A.push(["mal","✖",
+    `Llevas ${racha} pérdidas seguidas`,
+    `Tu propia regla dice: 2 seguidas → bajas el tamaño a 0.75%; 4 seguidas o −6× → se acabó
+     el día. Vas en ${rTot.toFixed(1)}×.`]);
+  else if(rTot<=-3) A.push(["mal","▼",
+    `Llevas ${rTot.toFixed(1)}× hoy`,
+    `A −6× tu regla cierra el día. Los días rojos de junio y julio se hicieron así:
+     el 6 de julio terminó en <b>−1,874 USDT</b>.`]);
+  else if(rTot<=-1.5 && ops.length>=3) A.push(["ojo","▽",
+    `El día se está torciendo: ${rTot.toFixed(1)}×`,
+    `Todavía no es el −3× que baja el tamaño ni el −6× que cierra el día, pero la dirección
+     ya está marcada. Aquí es donde toca bajar el tamaño, no subirlo.`]);
+  if(HORAS_ROJAS[h]!=null) A.push(["ojo","🕐",
+    `Las ${String(h).padStart(2,"0")}:00 son mala hora para ti`,
+    `Históricamente esta hora te ha costado <b>${HORAS_ROJAS[h]} USDT</b>. No quiere decir que
+     no se pueda: quiere decir que el listón sube.`]);
+  if(!A.length) return "";
+  return A.map(a=>`<div class="card" style="border-color:${a[0]==="mal"?"rgba(239,77,90,.34)":"rgba(240,169,46,.32)"}">
+    <div style="display:flex;gap:9px;align-items:flex-start">
+      <span style="font-size:15px">${a[1]}</span>
+      <div><b style="font-size:13.5px">${a[2]}</b><div class="sub" style="margin-top:2px">${a[3]}</div></div>
+    </div></div>`).join("");
+}
+function tarjetaSesion(now){
+  const {ops,rTot,racha,h}=resumenSesion(now);
+  const verde=HORAS_VERDES[h]!=null, roja=HORAS_ROJAS[h]!=null;
+  return `<div class="card"><h2>Tu día · son las ${String(h).padStart(2,"0")}:00${
+    verde?' · <span class="up">buena franja para ti</span>':roja?' · <span class="dn">mala franja para ti</span>':''}</h2>
+    ${kv("operaciones cerradas", `${ops.length}`)}
+    ${kv("cómo vas", `<b class="${rTot>0?'up':rTot<0?'dn':'nd'}">${rTot>=0?"+":""}${rTot.toFixed(1)}×</b>`,
+      "en veces lo que arriesgas, no en dinero: así se compara un día con otro")}
+    ${kv("pérdidas seguidas", `<span class="${racha>=2?'dn':'nd'}">${racha}</span>`)}
+    <div style="display:flex;gap:5px;margin-top:8px">
+      <button class="go" style="background:var(--card2);border-color:rgba(37,194,129,.45);color:var(--ok);font-size:12px;padding:8px 4px" onclick="registrar(1)">gané +1×</button>
+      <button class="go" style="background:var(--card2);border-color:rgba(239,77,90,.45);color:var(--no);font-size:12px;padding:8px 4px" onclick="registrar(-1)">perdí −1×</button>
+      <button class="go" style="background:var(--card2);border-color:var(--line);color:var(--dim);font-size:12px;padding:8px 4px" onclick="registrar(0)">salí en cero</button>
+    </div>
+    ${cruce(`Marca cada cierre y la app deja de estar ciega a lo único que no puede ver de Binance:
+      cómo vas tú hoy. Es lo que activa los avisos de racha y del tope del día.
+      <a href="#" onclick="borrarSesion();return false" style="color:var(--dim2)">reiniciar el día</a>
+      <br><br>Dato de tu historial que conviene tener presente: el número de operaciones al día
+      <b>no</b> predice si acabas en verde — tus tres mejores días tuvieron 37, 36 y 41 cierres y los
+      peores 23, 30 y 21. Lo que sí predice es el tamaño de la pérdida: la tuya promedió
+      <b>38.10 USDT</b> contra los 22.50 que decías arriesgar. Perdías más de lo que creías.`,"")}
+  </div>`;
+}
+
 const cruce=(txt,tono)=>`<div class="cruce ${tono||""}">${txt}</div>`;
 const kv=(k,v,s)=>`<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>${s?`<div class="sub" style="text-align:right">${s}</div>`:""}`;
 const vcard=(cls,t,s,li)=>`<div class="verd ${cls}"><div class="t">${t}</div><div class="s">${s}</div>${
