@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0a0d12">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Perp WLD">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Perp · WLD</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
 <style>
@@ -20,13 +26,13 @@
     --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 28px -12px rgba(0,0,0,.55);
   }
   html,body{margin:0;background:var(--bg);color:var(--tx);
-    font:15px/1.45 ui-sans-serif,-apple-system,"SF Pro Text",Segoe UI,Roboto,sans-serif}
+    font:15.5px/1.58 ui-sans-serif,-apple-system,"SF Pro Text",Segoe UI,Roboto,sans-serif}
   body{padding:0 10px calc(34px + env(safe-area-inset-bottom));
     background:
       radial-gradient(900px 420px at 85% -8%, rgba(109,155,255,.07), transparent 60%),
       radial-gradient(700px 380px at -10% 4%, rgba(47,209,140,.045), transparent 55%),
       var(--bg)}
-  .wrap{max-width:640px;margin:0 auto}
+  .wrap{max-width:656px;margin:0 auto}
   h1{font-size:15px;margin:0;font-weight:700;letter-spacing:-.2px}
   .mono{font-variant-numeric:tabular-nums;
     font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace}
@@ -46,10 +52,10 @@
   .badge.old{border-color:rgba(245,177,61,.45);color:var(--warn)}
   .badge.dead{border-color:rgba(255,84,104,.5);color:var(--no)}
 
-  .chips{display:flex;gap:5px;overflow-x:auto;padding-bottom:8px;margin-bottom:6px;
+  .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:8px;
     scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
-  .chip{flex:0 0 auto;padding:7px 12px;border-radius:20px;background:var(--card);
+  .chip{flex:0 0 auto;padding:8px 13px;border-radius:20px;background:var(--card);
     border:1px solid var(--line);color:var(--dim);font-size:12.5px;font-weight:650;
     cursor:pointer;white-space:nowrap;transition:border-color .15s,color .15s,background .15s}
   .chip:hover{border-color:var(--line2);color:var(--tx)}
@@ -80,51 +86,52 @@
 
   .card{background:linear-gradient(180deg,rgba(255,255,255,.016),transparent 34%),var(--card);
     border:1px solid var(--line);border-radius:var(--r-card);
-    padding:12px 13px;margin-bottom:8px;box-shadow:var(--shadow)}
-  .card h2{font-size:10.5px;color:var(--dim2);margin:0 0 9px;text-transform:uppercase;
-    letter-spacing:.8px;font-weight:750}
+    padding:15px 16px;margin-bottom:11px;box-shadow:var(--shadow)}
+  .card h2{font-size:11px;color:var(--dim2);margin:0 0 10px;text-transform:uppercase;
+    letter-spacing:.9px;font-weight:750}
 
   /* ── HERO: precio + sparkline con el plan encima ── */
   .hero{background:linear-gradient(180deg,rgba(255,255,255,.02),transparent 40%),var(--card);
     border:1px solid var(--line2);border-radius:var(--r-hero);
-    padding:13px 14px 10px;margin-bottom:8px;box-shadow:var(--shadow)}
+    padding:16px 16px 12px;margin-bottom:11px;box-shadow:var(--shadow)}
   .hero .l1{display:flex;align-items:baseline;gap:9px}
-  .hero .px{font-size:31px;font-weight:800;letter-spacing:-1px;line-height:1;
+  .hero .px{font-size:38px;font-weight:800;letter-spacing:-1px;line-height:1;
     font-variant-numeric:tabular-nums}
   .hero .chg{font-size:14px;font-weight:750;font-variant-numeric:tabular-nums}
   .hero .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
   .hero .meta span{font-size:10.5px;color:var(--dim);background:rgba(0,0,0,.24);
     border:1px solid var(--line);border-radius:var(--r-pill);padding:3px 7px;
     font-variant-numeric:tabular-nums}
-  .spark{display:block;width:100%;height:118px;margin-top:9px;cursor:crosshair}
-  .spark text{font:9.5px ui-monospace,Menlo,monospace;fill:var(--dim2)}
-  .spark .lead{font-size:10px;font-weight:700}
+  .spark{display:block;width:100%;height:150px;margin-top:11px;cursor:crosshair}
+  .spark text{font:10px ui-monospace,Menlo,monospace;fill:var(--dim2)}
+  .spark .lead{font-size:10.5px;font-weight:700}
 
-  .verd{padding:14px 15px;border-radius:var(--r-hero);margin-bottom:8px;border:1px solid;
+  .verd{padding:16px 17px;border-radius:var(--r-hero);margin-bottom:8px;border:1px solid;
     box-shadow:var(--shadow)}
   .verd.op{background:linear-gradient(165deg,rgba(47,209,140,.16),rgba(47,209,140,.03));border-color:rgba(47,209,140,.45)}
   .verd.no{background:linear-gradient(165deg,rgba(255,84,104,.14),rgba(255,84,104,.03));border-color:rgba(255,84,104,.38)}
   .verd.wt{background:linear-gradient(165deg,rgba(245,177,61,.13),rgba(245,177,61,.03));border-color:rgba(245,177,61,.38)}
-  .verd .t{font-size:20px;font-weight:800;letter-spacing:-.4px}
-  .verd .s{font-size:12.5px;color:var(--dim);margin-top:3px}
+  .verd .t{font-size:22px;font-weight:800;letter-spacing:-.4px}
+  .verd .s{font-size:13px;color:var(--dim);margin-top:4px}
   .verd ul{margin:8px 0 0;padding-left:17px}
-  .verd li{font-size:12.5px;margin:3px 0}
+  .verd li{font-size:13px;margin:4px 0}
 
-  .kv{display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:13px}
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:5.5px 0;font-size:13.5px}
   .kv .k{color:var(--dim);flex:0 0 auto}
   .kv .v{text-align:right;font-variant-numeric:tabular-nums}
-  .sub{font-size:11px;color:var(--dim2);margin-top:1px;line-height:1.45}
+  .sub{font-size:12px;color:var(--dim2);margin-top:1px;line-height:1.55}
+  .pbk{color:#c8d1e0;border-left:2px solid rgba(109,155,255,.5);padding-left:8px}
 
-  table{width:100%;border-collapse:collapse;font-size:12px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
   th{color:var(--dim2);font-weight:700;text-align:right;padding:3px 0;font-size:10px;
     text-transform:uppercase;letter-spacing:.45px}
   th:first-child,td:first-child{text-align:left}
-  td{padding:4.5px 0;text-align:right;font-variant-numeric:tabular-nums;
+  td{padding:6px 0;text-align:right;font-variant-numeric:tabular-nums;
     border-top:1px solid var(--line)}
 
   .up{color:var(--ok)} .dn{color:var(--no)} .nd{color:var(--dim2)}
   .wa{color:var(--warn)} .ac{color:var(--acc2)}
-  .pill{display:inline-block;font-size:10px;padding:2px 7px;border-radius:var(--r-pill);
+  .pill{display:inline-block;font-size:10.5px;padding:2.5px 8px;border-radius:var(--r-pill);
     background:var(--card2);border:1px solid var(--line);color:var(--dim);font-weight:650}
 
   .err{background:var(--no-soft);border:1px solid rgba(255,84,104,.4);
@@ -141,7 +148,7 @@
   #out>*:nth-child(4){animation-delay:.09s} #out>*:nth-child(5){animation-delay:.12s}
 
   /* ── SESGO ── */
-  .sesgo{border-radius:var(--r-hero);padding:14px 15px;margin-bottom:8px;border:1px solid;
+  .sesgo{border-radius:var(--r-hero);padding:16px 17px;margin-bottom:8px;border:1px solid;
     box-shadow:var(--shadow)}
   .sesgo.al{background:linear-gradient(160deg,rgba(47,209,140,.15),rgba(47,209,140,.03));
     border-color:rgba(47,209,140,.42)}
@@ -152,33 +159,33 @@
   .sesgo .lbl{font-size:10px;color:var(--dim2);text-transform:uppercase;
     letter-spacing:.95px;font-weight:750;margin-bottom:4px}
   .sesgo .dir{font-size:29px;font-weight:800;letter-spacing:-1px;line-height:1.05}
-  .sesgo .fza{font-size:12.5px;color:var(--dim);margin-top:4px}
+  .sesgo .fza{font-size:13px;color:var(--dim);margin-top:5px}
   .bar{height:7px;border-radius:4px;background:rgba(0,0,0,.32);margin:10px 0 3px;
     position:relative;overflow:hidden;border:1px solid rgba(0,0,0,.25)}
   .bar i{position:absolute;top:0;bottom:0;border-radius:4px;transition:width .3s}
   .bar .mid{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;
     background:var(--dim2);opacity:.5}
-  .tfrow{display:flex;gap:5px;margin-top:10px}
-  .tfrow div{flex:1;text-align:center;padding:6px 2px;border-radius:7px;
+  .tfrow{display:flex;gap:4px;margin-top:11px}
+  .tfrow div{flex:1;text-align:center;padding:7px 1px;border-radius:7px;
     background:rgba(0,0,0,.26);border:1px solid rgba(255,255,255,.03);
     font-size:10px;font-weight:750}
   .tfrow div span{display:block;font-size:9px;color:var(--dim2);font-weight:650;
     margin-bottom:2px;letter-spacing:.4px}
 
   /* ── ejecución ── */
-  .exec{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}
+  .exec{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}
   .exec .b{background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.03);
-    border-radius:9px;padding:10px 11px}
+    border-radius:9px;padding:12px 13px}
   .exec .b.full{grid-column:1/-1}
   .exec .b .k{font-size:9.5px;color:var(--dim2);text-transform:uppercase;
     letter-spacing:.75px;font-weight:750}
-  .exec .b .n{font-size:21px;font-weight:800;letter-spacing:-.5px;margin-top:2px;
+  .exec .b .n{font-size:23px;font-weight:800;letter-spacing:-.5px;margin-top:2px;
     font-variant-numeric:tabular-nums}
   .exec .b .x{font-size:10.5px;color:var(--dim);margin-top:1px}
 
   /* ── escalera de salida ── */
   .esc{margin-top:4px}
-  .esc .paso{display:flex;align-items:center;gap:10px;padding:9px 0;
+  .esc .paso{display:flex;align-items:center;gap:10px;padding:10px 0;
     border-top:1px solid var(--line)}
   .esc .paso:first-child{border-top:0}
   .esc .pct{flex:0 0 48px;text-align:center;font-size:14px;font-weight:800;
@@ -191,7 +198,7 @@
 
   details{background:var(--card);border:1px solid var(--line);
     border-radius:var(--r-card);margin-bottom:8px;overflow:hidden;box-shadow:var(--shadow)}
-  details>summary{padding:11px 13px;cursor:pointer;font-size:11px;color:var(--dim);
+  details>summary{padding:12px 14px;cursor:pointer;font-size:11.5px;color:var(--dim);
     text-transform:uppercase;letter-spacing:.75px;font-weight:750;list-style:none;
     transition:color .15s}
   details>summary::-webkit-details-marker{display:none}
@@ -203,7 +210,7 @@
   details .card{background:var(--card2);margin-bottom:7px;box-shadow:none}
 
   .alerta{display:flex;gap:9px;align-items:flex-start;padding:10px 12px;
-    border-radius:10px;margin-bottom:6px;font-size:12.5px;line-height:1.45;
+    border-radius:10px;margin-bottom:8px;font-size:13px;line-height:1.5;
     background:var(--warn-soft);border:1px solid rgba(245,177,61,.32)}
   .alerta.rojo{background:var(--no-soft);border-color:rgba(255,84,104,.34)}
   .alerta .ic{flex:0 0 auto;font-size:14px;line-height:1.2}
@@ -218,7 +225,7 @@
   .seg button.z{border-color:var(--line);color:var(--dim)}
   .seg button:active{transform:translateY(1px)}
 
-  @media (max-width:390px){ .hero .px{font-size:27px} .sesgo .dir{font-size:25px} }
+  @media (max-width:390px){ .hero .px{font-size:31px} .sesgo .dir{font-size:25px} .tfrow div{font-size:9px} }
 </style>
 </head>
 <body>
@@ -234,11 +241,23 @@
 
   <div class="chips" id="chips"></div>
 
+  <div class="card" id="rdCard" style="padding:12px 14px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:750">Radar de la watchlist</div>
+        <div class="sub">¿cuál de tus monedas tiene el mejor setup ahora? Escaneo ligero 15m/1h/4h.</div>
+      </div>
+      <button class="sec" id="rdBtn" style="width:auto;flex:0 0 auto">📡 Escanear</button>
+    </div>
+    <div id="rdOut"></div>
+  </div>
+
   <div class="row">
     <div><label>Equity USDT</label><input id="eq" type="number" inputmode="decimal" value="1500"></div>
     <div><label>Estilo</label><select id="st">
       <option value="scalp">Scalp · 5-30m</option>
       <option value="intraday" selected>Intraday · 30m-4h</option>
+      <option value="swing">Swing · 4h-24h</option>
     </select></div>
     <div style="flex:0 0 74px;display:flex;align-items:flex-end">
       <button class="go" id="go">Ver</button></div>
@@ -270,7 +289,18 @@
 <script>
 "use strict";
 // ═══════════════════════════════════════════════════════════════════════════
-// Perp WLD — operativa scalp/intraday sin servidor. · v2.4 (hist + ¿cuál sigo?)
+// Perp WLD — operativa scalp/intraday/swing sin servidor. · v2.6
+// v2.6 (2026-07-31): CATÁLOGO 45 TIPOS (+triples, three drives, taza con asa,
+// redondeos, divergencia de volumen, estrellas, soldados/cuervos, pinzas) con
+// umbrales endurecidos por comité (anti falso-positivo: gates de ubicación,
+// mediana de volumen, R² doble en redondeos, jerarquía anti doble-conteo) y
+// NOTIFICACIONES iOS reales: PWA instalable (manifest+iconos) + service worker
+// (sw.js) — en iPhone los avisos salen por registration.showNotification.
+// v2.5 (2026-07-31): niveles con PRECIO en el gráfico (entrada/stop/TP1/TP2/TP3/
+// invalida), SESGO con las 6 temporalidades + nivel de INTENSIFICACIÓN (simétrico
+// al de invalidación), OB/FVG con "reacciona al tocar → objetivo" numéricos,
+// catálogo +2 (divergencias RSI = 19 tipos), RADAR de watchlist (qué moneda tiene
+// el mejor setup ahora), estilo SWING 4h-24h y ronda 2 visual (aire, tipografía).
 // v2.4 (2026-07-30): WIN-RATE REAL por estructura (ventana 210 velas/TF,
 // solo tipos con desenlace binario; n chico marcado) adjunto a cada patrón
 // activo, y RANKING DE CONFLUENCIA "¿cuál sigo?": todas las estructuras de
@@ -308,7 +338,10 @@ const TIERS = {
 };
 const ESTILOS = {
   scalp:   {tfs:["15m","5m","1m"], rr:1.3, cal:8, maxH:0.5},
-  intraday:{tfs:["1h","15m","5m"], rr:2.0, cal:7, maxH:4}
+  intraday:{tfs:["1h","15m","5m"], rr:2.0, cal:7, maxH:4},
+  // swing 4h-24h: manda 4h/1d, entra por 1h, stop y objetivos más anchos; el
+  // funding se paga varias veces (fundingEn ya lo resta de cada R neto)
+  swing:   {tfs:["4h","1h","15m"], rr:2.5, cal:7, maxH:24}
 };
 const FUND_OK = 0.03, FUND_NO = 0.08, COLCHON = 0.25;
 // Granularidad: el tick no debe pasar del 25% del ATR del TF (si lo pasa, el
@@ -662,7 +695,25 @@ const PB={
  "Pin bar alcista (martillo)":"rechazo de mínimos: long sobre el high del pin con stop bajo su mecha",
  "Pin bar bajista":"rechazo de máximos: short bajo el low del pin con stop sobre su mecha",
  "Inside bar":"compresión: operar la ruptura del rango de la vela madre, stop al otro lado",
- "Doji":"indecisión: NO es entrada; esperar la vela siguiente"};
+ "Doji":"indecisión: NO es entrada; esperar la vela siguiente",
+ "Divergencia RSI bajista":"agotamiento del impulso: NO es entrada sola — combínala con estructura (doble techo, OB, sweep) para el short; se anula si precio y RSI hacen máximo nuevo juntos",
+ "Divergencia RSI alcista":"agotamiento de la caída: NO es entrada sola — búscale doble suelo, OB o sweep para el long; se anula si el RSI hace mínimo nuevo con el precio",
+ "Triple techo":"short al cierre bajo la neckline; stop sobre el tercer techo; objetivo = altura del patrón proyectada — más fiable que el doble pero más raro",
+ "Triple suelo":"long al cierre sobre la neckline; stop bajo el tercer suelo; objetivo = altura proyectada",
+ "Three Drives de techo":"3 empujes con extensión que se contrae y RSI cayendo: buscar giro — short al romper el último mínimo menor; stop sobre el 3er máximo",
+ "Three Drives de suelo":"3 caídas que se agotan con RSI subiendo: long al romper el último máximo menor; stop bajo el 3er mínimo",
+ "Taza con asa":"long al cierre sobre el borde de la taza; stop bajo el asa; objetivo = borde + profundidad de la taza",
+ "Taza invertida":"short al cierre bajo el borde; stop sobre el asa; objetivo = borde − profundidad",
+ "Redondeo de techo":"distribución gradual: short al cierre bajo la neckline del arco; stop sobre el vértice; objetivo = altura del arco proyectada",
+ "Redondeo de suelo":"acumulación gradual: long al cierre sobre la neckline del arco; stop bajo el vértice; objetivo = altura proyectada",
+ "Divergencia de volumen bajista":"máximo nuevo sin volumen: el empuje va seco — NO es entrada sola; refuerza doble techo/OB/sweep en la misma zona",
+ "Divergencia de volumen alcista":"mínimo nuevo sin volumen: la venta se agota — refuerza doble suelo/OB/sweep de la zona",
+ "Estrella de la mañana":"giro alcista de 3 velas EN un nivel: long sobre el high de la 3ª; stop bajo el low de la estrella",
+ "Estrella de la tarde":"giro bajista de 3 velas en resistencia: short bajo el low de la 3ª; stop sobre el high de la estrella",
+ "Tres soldados blancos":"momentum comprador desde un nivel: continuación — entrar en el primer pullback, no perseguir la 3ª vela",
+ "Tres cuervos negros":"momentum vendedor desde un nivel: continuación — short en el primer rebote débil, no perseguir",
+ "Pinzas de techo":"doble rechazo al tick en resistencia: short bajo el low de la 2ª vela; stop sobre las mechas",
+ "Pinzas de suelo":"doble rechazo al tick en soporte: long sobre el high de la 2ª vela; stop bajo las mechas"};
 
 function linreg(pts){ const n=pts.length; if(n<2) return null;
   let sx=0,sy=0,sxx=0,sxy=0;
@@ -812,7 +863,14 @@ function patOBs(v,a){
                                                :Math.min(...post.map(y=>y.l))<=zona[0]-a);
           est=rebota?"RESPETADO":"MITIGADO"; fin={t:q.t,px:dir==="long"?zona[1]:zona[0]}; }
         break; }
-      R.push({tipo,dir,estado:est,ini:{t:c.t,px:dir==="long"?zona[1]:zona[0]},fin,zona,
+      // v2.5: el OB VIGENTE dice dónde reacciona, a dónde va y dónde muere.
+      // objetivo = extremo del impulso que nació de la zona (playbook: "TP el
+      // último máximo/mínimo"); invalida = cierre al otro lado de la zona.
+      let obj=null, stop=null;
+      if(est==="VIGENTE"){ const post=v.slice(i+1);
+        obj = dir==="long"?Math.max(...post.map(y=>y.h)):Math.min(...post.map(y=>y.l));
+        stop = f(dir==="long"?zona[0]-0.3*a:zona[1]+0.3*a); }
+      R.push({tipo,dir,estado:est,ini:{t:c.t,px:dir==="long"?zona[1]:zona[0]},fin,zona,obj,stop,
         nota:`impulso de ${(Math.abs(net)/a).toFixed(1)} ATR desde la zona`});
     }
   }
@@ -832,9 +890,12 @@ function patFVGs(v,a){
       const tipo=alc?"FVG alcista":"FVG bajista";
       if(fill) R.push({tipo,dir:alc?"long":"short",estado:"MITIGADO",
         ini:{t:v[i].t,px:alc?hi_:lo_},fin:fill,zona:[lo_,hi_],nota:`rellenado 100%`});
-      else if(pen<0.5) R.push({tipo,dir:alc?"long":"short",estado:"VIGENTE",
+      else if(pen<0.5){ const post=v.slice(i+2);
+        R.push({tipo,dir:alc?"long":"short",estado:"VIGENTE",
         ini:{t:v[i].t,px:alc?hi_:lo_},fin:null,zona:[lo_,hi_],
-        nota:`${(pen*100).toFixed(0)}% mitigado`});
+        obj:post.length?(alc?Math.max(...post.map(q=>q.h)):Math.min(...post.map(q=>q.l))):null,
+        stop:f(alc?lo_-0.3*a:hi_+0.3*a),
+        nota:`${(pen*100).toFixed(0)}% mitigado`}); }
     }
   }
   const px=v[v.length-1].c;
@@ -881,7 +942,7 @@ function patEstructura(v,a){
     nota:`${e.tipo} ${e.dir==="long"?"alcista":"bajista"} sobre ${f(e.px)}`}));
 }
 
-function patVelas(v){
+function patVelas(v,a,nivRef){
   const u=v[v.length-1], p=v[v.length-2]; if(!u||!p) return [];
   const R=[], cuerpo=Math.abs(u.c-u.o), rango=(u.h-u.l)||1e-12;
   if(u.c>u.o&&p.c<p.o&&u.c>=p.o&&u.o<=p.c&&cuerpo>Math.abs(p.c-p.o))
@@ -893,15 +954,239 @@ function patVelas(v){
   if(mi>0.6*rango&&cuerpo<0.25*rango) R.push({tipo:"Pin bar bajista",dir:"short"});
   if(u.h<=p.h&&u.l>=p.l) R.push({tipo:"Inside bar",dir:null});
   if(cuerpo<0.1*rango&&!R.length) R.push({tipo:"Doji",dir:null});
+  // ── familias v2.6 con GATE de ubicación (comité): tres familias más sobre
+  // las seis clásicas serían spam en 5m — solo cuentan si ocurren a ≤0.5·ATR
+  // de un nivel ya detectado (zona/neckline/swing) y con vela clave ≥0.7·ATR.
+  const cerca=px=>!!(a&&nivRef&&nivRef.length&&nivRef.some(nv=>Math.abs(px-nv)<=0.5*a));
+  const p2=v[v.length-3];
+  if(a&&p2){
+    const b2=Math.abs(p2.c-p2.o), b1=Math.abs(p.c-p.o), r2r=(p2.h-p2.l)||1e-12;
+    if((p2.h-p2.l)>=0.7*a){
+      if(cerca(Math.min(p2.l,p.l,u.l))&&p2.c<p2.o&&b2>0.5*r2r&&b1<=0.35*b2&&u.c>u.o&&u.c>=(p2.o+p2.c)/2)
+        R.push({tipo:"Estrella de la mañana",dir:"long"});
+      if(cerca(Math.max(p2.h,p.h,u.h))&&p2.c>p2.o&&b2>0.5*r2r&&b1<=0.35*b2&&u.c<u.o&&u.c<=(p2.o+p2.c)/2)
+        R.push({tipo:"Estrella de la tarde",dir:"short"});
+    }
+    if((u.h-u.l)>=0.7*a&&cerca(p2.o)){
+      const sold=[p2,p,u].every(x=>x.c>x.o&&(x.c-x.o)>0.55*((x.h-x.l)||1e-12));
+      const cuer=[p2,p,u].every(x=>x.c<x.o&&(x.o-x.c)>0.55*((x.h-x.l)||1e-12));
+      if(sold&&p.c>p2.c&&u.c>p.c) R.push({tipo:"Tres soldados blancos",dir:"long"});
+      if(cuer&&p.c<p2.c&&u.c<p.c) R.push({tipo:"Tres cuervos negros",dir:"short"});
+    }
+  }
+  if(a&&(u.h-u.l)>=0.7*a){
+    const tol=0.15*Math.max(u.h-u.l,p.h-p.l);
+    if(cerca(Math.max(u.h,p.h))&&Math.abs(u.h-p.h)<=tol&&p.c>p.o&&u.c<u.o&&(u.h-Math.max(u.o,u.c))>0.3*rango)
+      R.push({tipo:"Pinzas de techo",dir:"short"});
+    if(cerca(Math.min(u.l,p.l))&&Math.abs(u.l-p.l)<=tol&&p.c<p.o&&u.c>u.o&&(Math.min(u.o,u.c)-u.l)>0.3*rango)
+      R.push({tipo:"Pinzas de suelo",dir:"long"});
+  }
   return R.map(x=>({...x,estado:"SEÑAL",ini:{t:u.t,px:u.c},fin:null,nota:"última vela cerrada"}));
 }
 
 const PAT_ACT=["FORMÁNDOSE","CONFIRMADO","VIGENTE","SEÑAL"];
 // Tipos con desenlace BINARIO medible → solo de estos se calcula win-rate.
 // (Sweeps/BOS/CHoCH/velas son eventos sin condición de fallo: no se cuentan.)
-const PAT_MED={"Doble techo":1,"Doble suelo":1,"HCH":1,"HCH invertido":1,
+const PAT_MED={"Doble techo":1,"Doble suelo":1,"Triple techo":1,"Triple suelo":1,
+  "HCH":1,"HCH invertido":1,
   "Bandera alcista":1,"Bandera bajista":1,"Order Block alcista":1,"Order Block bajista":1};
 const PAT_WIN={"COMPLETADO":1,"RESPETADO":1}, PAT_LOSS={"INVALIDADO":1,"ROTO":1};
+
+// ── v2.5: divergencias RSI precio↔momentum sobre los dos últimos swings ──
+// Divergencia = el precio hace extremo nuevo y el RSI no lo confirma. Es AVISO
+// de agotamiento, no entrada: entra al catálogo como SEÑAL (sin desenlace
+// binario medible → no participa del win-rate).
+function rsiSerie(c,n=14){ if(c.length<n+1) return null;
+  const out=new Array(c.length).fill(null);
+  let g=0,l=0; for(let i=1;i<=n;i++){const d=c[i]-c[i-1]; d>0?g+=d:l-=d;}
+  let ag=g/n, al=l/n;
+  out[n]= al===0?100:100-100/(1+ag/al);
+  for(let i=n+1;i<c.length;i++){const d=c[i]-c[i-1];
+    ag=(ag*(n-1)+Math.max(d,0))/n; al=(al*(n-1)+Math.max(-d,0))/n;
+    out[i]= al===0?100:100-100/(1+ag/al);}
+  return out; }
+
+function patDivergencias(v,a){
+  if(!a||v.length<40) return [];
+  const R=rsiSerie(v.map(x=>x.c)); if(!R) return [];
+  const [hi,lo]=swings(v,3), out=[];
+  const mira=(arr,esHigh)=>{
+    for(let i=arr.length-1;i>0;i--){
+      const [i2,p2]=arr[i], [i1,p1]=arr[i-1];
+      if(i2<v.length-12) break;               // el 2º swing debe ser reciente
+      if(i2-i1<5||i2-i1>60) break;
+      const r1=R[i1], r2=R[i2]; if(r1==null||r2==null) break;
+      if(esHigh && p2>p1+0.05*a && r2<r1-2)
+        out.push({tipo:"Divergencia RSI bajista",dir:"short",estado:"SEÑAL",
+          ini:{t:v[i1].t,px:p1},fin:null,
+          nota:`precio ${f(p1)}→${f(p2)} sube, RSI ${r1.toFixed(0)}→${r2.toFixed(0)} baja`});
+      if(!esHigh && p2<p1-0.05*a && r2>r1+2)
+        out.push({tipo:"Divergencia RSI alcista",dir:"long",estado:"SEÑAL",
+          ini:{t:v[i1].t,px:p1},fin:null,
+          nota:`precio ${f(p1)}→${f(p2)} baja, RSI ${r1.toFixed(0)}→${r2.toFixed(0)} sube`});
+      break;                                   // solo el par más reciente
+    }};
+  mira(hi,true); mira(lo,false);
+  return out;
+}
+
+// ── v2.6: TRIPLE techo/suelo — como el doble pero con 3 toques (comité:
+// separación ≥6 velas c/u; invalida por CIERRE a 0.5·ATR — más holgado que la
+// tolerancia entre picos para que un 4º test legítimo no lo mate). Binario →
+// participa del win-rate. El doble solapado se suprime en la jerarquía.
+function patTriples(v,a){
+  const R=[], [hi0,lo0]=swings(v,3);
+  // mesetas: dos swings a ≤2 velas y ≤0.15·ATR son EL MISMO toque (queda el extremo)
+  const colapsa=(pv,esTecho)=>{ const r=[];
+    for(const [i,px] of pv){ const L=r[r.length-1];
+      if(L&&i-L[0]<=2&&Math.abs(px-L[1])<=0.15*a){
+        if(esTecho?px>=L[1]:px<=L[1]){ L[0]=i; L[1]=px; } continue; }
+      r.push([i,px]); }
+    return r; };
+  const hi=colapsa(hi0,true), lo=colapsa(lo0,false);
+  const scan=(pv,esTecho)=>{
+    for(let i=0;i+2<pv.length;i++){
+      const [i1,p1]=pv[i],[i2,p2]=pv[i+1],[i3,p3]=pv[i+2];
+      if(i3-i1>80||i2-i1<6||i3-i2<6) continue;
+      const tol=0.35*a;
+      if(Math.abs(p1-p2)>tol||Math.abs(p2-p3)>tol||Math.abs(p1-p3)>tol) continue;
+      const seg=v.slice(i1,i3+1);
+      const neck=esTecho?Math.min(...seg.map(x=>x.l)):Math.max(...seg.map(x=>x.h));
+      const ext=esTecho?Math.max(p1,p2,p3):Math.min(p1,p2,p3);
+      const alto=Math.abs((p1+p2+p3)/3-neck); if(alto<1.2*a) continue;
+      const obj=esTecho?neck-alto:neck+alto;
+      const inval=esTecho?ext+0.5*a:ext-0.5*a;
+      let act=null,fin=null,est=null;
+      for(let j=i3+1;j<v.length;j++){ const c=v[j];
+        if(!act){ if(esTecho?c.c<neck:c.c>neck){ act={t:c.t,px:neck}; }
+          else if(esTecho?c.c>inval:c.c<inval){ est="INVALIDADO"; fin={t:c.t,px:c.c}; break; } }
+        else { if(esTecho?c.l<=obj:c.h>=obj){ est="COMPLETADO"; fin={t:c.t,px:obj}; break; }
+          if(esTecho?c.c>ext:c.c<ext){ est="INVALIDADO"; fin={t:c.t,px:c.c}; break; } } }
+      const tipo=esTecho?"Triple techo":"Triple suelo", dir=esTecho?"short":"long";
+      const base={tipo,dir,ini:{t:v[i1].t,px:p1},zona:[Math.min(p1,p2,p3,neck),Math.max(p1,p2,p3,neck)],
+        nota:`tres toques ${f(p1)}/${f(p2)}/${f(p3)}, neckline ${f(neck)}`};
+      if(est) R.push({...base,estado:est,act,fin,obj,res:act&&fin?((fin.px/act.px-1)*100):null});
+      else if(act) R.push({...base,estado:"CONFIRMADO",act,fin:null,obj,stop:f(inval)});
+      else if(i3>=v.length-30) R.push({...base,estado:"FORMÁNDOSE",act:null,fin:null,obj,
+        gatillo:`cierre ${esTecho?"bajo":"sobre"} ${f(neck)}`,stop:f(inval)});
+    } };
+  scan(hi,true); scan(lo,false); return R;
+}
+
+// ── v2.6: THREE DRIVES — upgrade de la divergencia RSI, no evidencia aparte
+// (comité: contracción ESTRICTA d2 ≤ 0.95·d1 y divergencia ≥5 pts; la
+// divergencia RSI simple del mismo lado se suprime en la jerarquía).
+function patThreeDrives(v,a){
+  const out=[], R=rsiSerie(v.map(x=>x.c)); if(!R) return out;
+  const [hi,lo]=swings(v,3);
+  const scan=(pv,esAlza)=>{
+    if(pv.length<3) return;
+    const [i1,p1]=pv[pv.length-3],[i2,p2]=pv[pv.length-2],[i3,p3]=pv[pv.length-1];
+    if(i3<v.length-12||i3-i1>90) return;
+    const asc=esAlza?(p2>p1+0.3*a&&p3>p2+0.3*a):(p2<p1-0.3*a&&p3<p2-0.3*a);
+    if(!asc) return;
+    const d1=Math.abs(p2-p1), d2=Math.abs(p3-p2);
+    if(!(d2<=0.95*d1)) return;                 // sin contracción no hay agotamiento
+    const r1=R[i1],r3=R[i3]; if(r1==null||r3==null) return;
+    if(esAlza?!(r3<r1-5):!(r3>r1+5)) return;   // divergencia exigida ≥5 pts
+    out.push({tipo:esAlza?"Three Drives de techo":"Three Drives de suelo",
+      dir:esAlza?"short":"long",estado:"SEÑAL",ini:{t:v[i1].t,px:p1},fin:null,
+      nota:`3 empujes ${f(p1)}→${f(p2)}→${f(p3)}, extensión ${(d2/d1*100).toFixed(0)}% de la previa, RSI ${r1.toFixed(0)}→${r3.toFixed(0)}`});
+  };
+  scan(hi,true); scan(lo,false); return out;
+}
+
+// ── v2.6: TAZA CON ASA (solo 1h/4h/1d) — asa 12-38% de la profundidad y
+// anti-V del comité: ninguna vela puede aportar >40% del descenso.
+function patTaza(v,a){
+  const out=[]; const N=v.length; if(N<50) return out;
+  for(const alc of [true,false]){
+    const W=Math.min(N-8,64), w=v.slice(N-8-W, N-8);
+    if(w.length<28) continue;
+    const rimL=alc?Math.max(...w.slice(0,5).map(x=>x.h)):Math.min(...w.slice(0,5).map(x=>x.l));
+    const rimR=alc?Math.max(...w.slice(-5).map(x=>x.h)):Math.min(...w.slice(-5).map(x=>x.l));
+    if(Math.abs(rimL-rimR)>0.6*a) continue;
+    const rim=alc?Math.max(rimL,rimR):Math.min(rimL,rimR);
+    const fondo=alc?Math.min(...w.map(x=>x.l)):Math.max(...w.map(x=>x.h));
+    const iF=w.findIndex(x=>(alc?x.l:x.h)===fondo);
+    if(iF<Math.floor(w.length/3)||iF>Math.ceil(w.length*2/3)) continue;
+    const depth=Math.abs(rim-fondo); if(depth<2*a) continue;
+    if(Math.max(...w.map(x=>x.h-x.l))>0.4*depth) continue;   // anti-V (liquidación)
+    const asa=v.slice(N-8);
+    const asaExt=alc?Math.min(...asa.map(x=>x.l)):Math.max(...asa.map(x=>x.h));
+    const retr=Math.abs(rim-asaExt)/depth;
+    if(retr>0.38||retr<0.12) continue;
+    const u=v[N-1];
+    const conf=alc?u.c>rim+0.1*a:u.c<rim-0.1*a;
+    out.push({tipo:alc?"Taza con asa":"Taza invertida",dir:alc?"long":"short",
+      estado:conf?"CONFIRMADO":"FORMÁNDOSE",
+      ini:{t:w[0].t,px:rim}, act:conf?{t:u.t,px:rim}:null, fin:null,
+      obj:alc?rim+depth:rim-depth,
+      zona:[Math.min(asaExt,rim),Math.max(asaExt,rim)],
+      gatillo:conf?null:`cierre ${alc?"sobre":"bajo"} ${f(rim)}`,
+      stop:f(alc?asaExt-0.3*a:asaExt+0.3*a),
+      nota:`taza de ${(depth/a).toFixed(1)} ATR con asa del ${(retr*100).toFixed(0)}%`});
+  }
+  return out;
+}
+
+// ── v2.6: REDONDEO (solo 4h/1d) — comité: R² ≥ 0.85 Y mejora ≥0.15 sobre el
+// ajuste LINEAL (una parábola monótona ya no cuela); objetivo por movimiento
+// medido (altura vértice→neckline proyectada), no "regreso al origen".
+function patRedondeo(v,a){
+  const out=[], N=v.length, Wn=Math.min(N,44); if(Wn<30) return out;
+  const w=v.slice(-Wn), cs=w.map(x=>x.c), n=cs.length;
+  let Sx=0,Sx2=0,Sx3=0,Sx4=0,Sy=0,Sxy=0,Sx2y=0;
+  for(let i=0;i<n;i++){ const x=i,y=cs[i];
+    Sx+=x; Sx2+=x*x; Sx3+=x*x*x; Sx4+=x*x*x*x; Sy+=y; Sxy+=x*y; Sx2y+=x*x*y; }
+  const M=[[Sx4,Sx3,Sx2],[Sx3,Sx2,Sx],[Sx2,Sx,n]], Vv=[Sx2y,Sxy,Sy];
+  const det3=m=>m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1])-m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0])+m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0]);
+  const D0=det3(M); if(!D0) return out;
+  const col=(m,c,vec)=>m.map((row,ri)=>row.map((x,ci)=>ci===c?vec[ri]:x));
+  const A=det3(col(M,0,Vv))/D0, B=det3(col(M,1,Vv))/D0, C=det3(col(M,2,Vv))/D0;
+  const arco=Math.abs(A)*(n*n)/4; if(arco<1.5*a) return out;
+  const mu=Sy/n; let ssr=0,sst=0;
+  for(let i=0;i<n;i++){ const yh=A*i*i+B*i+C; ssr+=(cs[i]-yh)*(cs[i]-yh); sst+=(cs[i]-mu)*(cs[i]-mu); }
+  const r2=sst?1-ssr/sst:0; if(r2<0.85) return out;
+  const lr=linreg(cs.map((y,i)=>[i,y])); if(!lr) return out;
+  let ssrL=0; for(let i=0;i<n;i++){ const yl=lr.m*i+lr.b; ssrL+=(cs[i]-yl)*(cs[i]-yl); }
+  const r2lin=sst?1-ssrL/sst:0;
+  if(r2-r2lin<0.15) return out;                 // la curva debe GANARLE a la recta
+  const xv=-B/(2*A); if(xv<n*0.25||xv>n*0.85) return out;
+  const techo=A<0;
+  const vy=A*xv*xv+B*xv+C;
+  const neck=techo?Math.min(...w.map(x=>x.l)):Math.max(...w.map(x=>x.h));
+  const altura=Math.abs(vy-neck);
+  out.push({tipo:techo?"Redondeo de techo":"Redondeo de suelo",dir:techo?"short":"long",
+    estado:"FORMÁNDOSE",ini:{t:w[0].t,px:cs[0]},fin:null,
+    obj:techo?neck-altura:neck+altura,
+    gatillo:`cierre ${techo?"bajo":"sobre"} ${f(neck)}`,
+    stop:f(techo?vy+0.3*a:vy-0.3*a),
+    nota:`arco de ${(arco/a).toFixed(1)} ATR (R² ${(r2*100).toFixed(0)}%, +${((r2-r2lin)*100).toFixed(0)} vs recta), vértice hace ${(n-1-xv).toFixed(0)} velas`});
+  return out;
+}
+
+// ── v2.6: DIVERGENCIA DE VOLUMEN — comité: MEDIANA (un spike de liquidación
+// no la fabrica), ratio ≤60% y primer empuje ≥1.3× la mediana de 20.
+function patDivergenciaVol(v,a){
+  const out=[], [hi,lo]=swings(v,3);
+  const med=arr=>{ const s=[...arr].sort((x,y)=>x-y); return s.length?s[Math.floor(s.length/2)]:0; };
+  const volSw=i=>med(v.slice(Math.max(0,i-2),i+3).map(x=>x.vol));
+  const base20=med(v.slice(-20).map(x=>x.vol));
+  const mira=(arr,esHigh)=>{
+    if(arr.length<2) return;
+    const [i1,p1]=arr[arr.length-2],[i2,p2]=arr[arr.length-1];
+    if(i2<v.length-12||i2-i1<5||i2-i1>60) return;
+    if(!(esHigh?p2>p1+0.05*a:p2<p1-0.05*a)) return;
+    const v1=volSw(i1), v2=volSw(i2); if(!v1||!v2) return;
+    if(!(v1>=1.3*base20)) return;               // el 1er empuje debió tener volumen real
+    if(v2>0.60*v1) return;                      // y el 2º ir claramente seco
+    out.push({tipo:esHigh?"Divergencia de volumen bajista":"Divergencia de volumen alcista",
+      dir:esHigh?"short":"long",estado:"SEÑAL",ini:{t:v[i1].t,px:p1},fin:null,
+      nota:`${esHigh?"máximo":"mínimo"} nuevo ${f(p2)} con volumen al ${(v2/v1*100).toFixed(0)}% del empuje anterior`});
+  };
+  mira(hi,true); mira(lo,false); return out;
+}
 
 function detectarPatrones(D){
   const tfs={}, porTf={}, stats={};
@@ -911,8 +1196,20 @@ function detectarPatrones(D){
   for(const tf of ["5m","15m","1h","4h","1d"]){
     const cr=D.v[tf]; if(!cr||cr.length<40) continue;
     const v=cerradas(cr), a=atr(v); if(!a) continue;
-    let ins=[].concat(patDobles(v,a),patHCH(v,a),patLineas(v,a),patBandera(v,a),
-      patOBs(v,a),patFVGs(v,a),patSweeps(v,a),patEstructura(v,a),patVelas(v));
+    let ins=[].concat(patDobles(v,a),patTriples(v,a),patHCH(v,a),patLineas(v,a),patBandera(v,a),
+      patOBs(v,a),patFVGs(v,a),patSweeps(v,a),patEstructura(v,a),patDivergencias(v,a),
+      patDivergenciaVol(v,a),patThreeDrives(v,a),
+      (tf==="1h"||tf==="4h"||tf==="1d")?patTaza(v,a):[],
+      (tf==="4h"||tf==="1d")?patRedondeo(v,a):[]);
+    // niveles de referencia para el gate de ubicación de las señales de vela
+    const nivRef=[];
+    for(const x of ins){ if(x.zona){nivRef.push(x.zona[0],x.zona[1]);}
+      if(x.ini&&x.ini.px!=null) nivRef.push(x.ini.px);
+      if(x.obj!=null) nivRef.push(x.obj); }
+    const [hiS,loS]=swings(v,3);
+    for(const [,pz] of hiS.slice(-4)) nivRef.push(pz);
+    for(const [,pz] of loS.slice(-4)) nivRef.push(pz);
+    ins=ins.concat(patVelas(v,a,nivRef));
     // dedupe: mismo tipo+dirección con origen a <0.5·ATR = la misma figura
     // repetida por swings vecinos → queda la más reciente. Zonas distintas
     // del mismo tipo (p.ej. dos OB a niveles diferentes) se conservan.
@@ -923,12 +1220,23 @@ function detectarPatrones(D){
         u.ini&&u.ini.px!=null&&Math.abs(u.ini.px-x.ini.px)<=0.5*a)) continue;
       uniq.push(x);
     }
-    for(const x of uniq){ x._tf=tf; x._atr=a;
+    // jerarquía anti doble-conteo (comité v2.6): la figura más específica gana
+    // — el mismo giro no debe puntuar como doble Y triple Y taza Y divergencia.
+    const dep=uniq.filter(x=>{
+      if(x.tipo.startsWith("Doble")){
+        if(uniq.some(u2=>u2.tipo.startsWith("Triple")&&u2.dir===x.dir&&u2.ini&&x.ini&&u2.ini.px!=null&&x.ini.px!=null&&Math.abs(u2.ini.px-x.ini.px)<=2*a)) return false;
+        if(uniq.some(u2=>u2.tipo.startsWith("Taza")&&u2.dir===x.dir)) return false;
+      }
+      if(x.tipo.startsWith("Redondeo")&&uniq.some(u2=>u2.tipo.startsWith("Taza")&&u2.dir===x.dir)) return false;
+      if(x.tipo.startsWith("Divergencia RSI")&&uniq.some(u2=>u2.tipo.startsWith("Three Drives")&&u2.dir===x.dir)) return false;
+      return true;
+    });
+    for(const x of dep){ x._tf=tf; x._atr=a;
       if(PAT_MED[x.tipo]){
         if(PAT_WIN[x.estado]){ const s=S(x.tipo,tf); s.w++; s.tf[tf].w++; }
         else if(PAT_LOSS[x.estado]){ const s=S(x.tipo,tf); s.l++; s.tf[tf].l++; }
       } }
-    porTf[tf]=uniq;
+    porTf[tf]=dep;
   }
   // pase 2: adjuntar histórico a los ACTIVOS y capar la salida visible
   for(const tf of Object.keys(porTf)){
@@ -996,32 +1304,58 @@ function rankPatrones(D, SES){
   return R;
 }
 
-function cardLider(RANK){
+function cardLider(RANK,D){
   if(!RANK||!RANK.length) return "";
-  const L=RANK[0];
-  const fmt=r=>`${r.x.tipo}${r.x.dir?` (${r.x.dir==="long"?"alcista":"bajista"})`:""} · ${r.tf} · [${r.x.estado}]`;
-  let h=`<div class="card" style="border-color:var(--acc)"><h2>¿Cuál sigo? — todas las estructuras compiten, todos los marcos</h2>
+  const L=RANK[0], x=L.x;
+  // sin redundancia (comité): el nombre ya dice alcista/bajista casi siempre —
+  // la flecha solo aparece cuando el nombre no trae dirección; estado va en pill
+  const fmt=r=>`${r.x.tipo}${r.x.dir&&!/alcista|bajista|invertido|techo|suelo/i.test(r.x.tipo)?(r.x.dir==="long"?" ↑":" ↓"):""} · ${r.tf}`;
+  // v2.5: los números operables del líder en GRANDE — dónde reacciona, a dónde
+  // va, dónde muere y cuánto acierta — en vez de enterrados en una línea corrida
+  const niv=[];
+  const edge = x.zona ? (x.dir==="long"?x.zona[1]:x.zona[0]) : null;
+  if(x.gatillo) niv.push(["Gatillo",x.gatillo,"aún no abre: esperar este cierre",1]);
+  else if(edge!=null&&x.estado==="VIGENTE") niv.push(["Reacciona al tocar",f(edge),`zona ${f(x.zona[0])}–${f(x.zona[1])}`,0]);
+  else if(x.zona) niv.push(["Zona",`${f(x.zona[0])}–${f(x.zona[1])}`,"",1]);
+  else if(x.act) niv.push(["Abrió en",f(x.act.px),"",0]);
+  else if(x.lineas) niv.push(["Bordes",`${f(x.lineas.inf)} / ${f(x.lineas.sup)}`,"inferior / superior",1]);
+  if(x.obj!=null&&!x.fin){ const dd=D&&D.mark?((x.obj/D.mark-1)*100):null;
+    niv.push(["Objetivo (donde debería cerrar)",f(x.obj),dd!=null?`${dd>=0?"+":""}${dd.toFixed(2)}% desde aquí`:"",0]); }
+  const iv = x.stop!=null?parseFloat(x.stop):(x.zona&&x.dir?(x.dir==="long"?x.zona[0]:x.zona[1]):null);
+  if(iv!=null&&isFinite(iv)){
+    const rel=D&&D.mark?`${(Math.abs(iv/D.mark-1)*100).toFixed(2)}% ${iv>D.mark?"arriba":"abajo"} del precio`:"";
+    niv.push(["Invalida (la idea muere)",x.stop!=null?x.stop:f(iv),
+      (x.stop!=null?"":"cierre al otro lado de la zona · ")+rel,0]);
+  }
+  if(x.hist) niv.push(["Win-rate real",`${x.hist.p}%`,`${x.hist.w} de ${x.hist.n}${x.hist.n<5?" · ⚠ muestra chica":""}`,0]);
+  // si queda un número impar de cajas a media anchura, la última se estira
+  if(niv.filter(n=>!n[3]).length%2===1){ for(let i=niv.length-1;i>=0;i--){ if(!niv[i][3]){ niv[i][3]=1; break; } } }
+  let h=`<div class="card" style="border-color:var(--acc)"><h2>¿Cuál sigo? · el ranking</h2>
     <div style="display:flex;align-items:flex-start;gap:8px">
-      <div style="flex:1;font-size:16px;font-weight:800;letter-spacing:-.3px;min-width:0" class="${L.x.dir==="long"?"up":L.x.dir==="short"?"dn":"nd"}">${fmt(L)}</div>
-      <span class="pill" style="flex:0 0 auto">score ${L.score.toFixed(1)}/10</span></div>
-    <div class="sub" style="margin-top:5px">${fmtPatron(L.x)}</div>
+      <div style="flex:1;font-size:17px;font-weight:800;letter-spacing:-.3px;min-width:0" class="${x.dir==="long"?"up":x.dir==="short"?"dn":"nd"}">${fmt(L)}</div>
+      <span class="pill" style="flex:0 0 auto">${x.estado}</span>
+      <span class="pill" style="flex:0 0 auto;color:var(--acc2);border-color:rgba(109,155,255,.4)">score ${L.score.toFixed(1)}/10</span></div>
+    ${niv.length?`<div class="exec" style="margin-top:10px">${niv.map(n=>`<div class="b${n[3]?" full":""}"><div class="k">${n[0]}</div><div class="n" style="font-size:${String(n[1]).length>14?"13.5":"18"}px${n[0].startsWith("Invalida")?";color:var(--no)":n[0].startsWith("Objetivo")?";color:var(--ok)":""}">${n[1]}</div>${n[2]?`<div class="x">${n[2]}</div>`:""}</div>`).join("")}</div>`:""}
+    <div class="sub" style="margin-top:8px">${fmtPatron(x,true)}</div>
     ${L.por.length?`<div class="sub" style="margin-top:6px"><span class="up">✓</span> ${L.por.join(" · ")}</div>`:""}
     ${L.contra.length?`<div class="sub"><span class="dn">✗</span> ${L.contra.join(" · ")}</div>`:""}
-    <div class="sub ac" style="margin-top:6px">→ ${PB[L.x.tipo]||""}</div>`;
+    <div class="sub pbk" style="margin-top:8px">→ ${PB[x.tipo]||""}</div>`;
   if(RANK.length>1){
     h+=`<div style="margin-top:9px;border-top:1px solid var(--line);padding-top:7px">`+
-      RANK.slice(1,4).map(r=>`<div class="kv"><span class="k">${fmt(r)}</span><span class="v nd">${r.score.toFixed(1)}</span></div>`).join("")+`</div>`;
+      RANK.slice(1,4).map(r=>`<div class="kv"><span class="k">${fmt(r)} · ${r.x.estado.toLowerCase()}</span><span class="v nd">${r.score.toFixed(1)}<span style="color:var(--dim2);font-size:11px">/10</span></span></div>
+        <div style="height:3px;border-radius:2px;background:rgba(0,0,0,.3);margin:1px 0 5px;overflow:hidden"><div style="height:100%;width:${(r.score*10).toFixed(0)}%;background:var(--line2);border-radius:2px"></div></div>`).join("")+`</div>`;
   }
-  h+=`<div class="sub nd" style="margin-top:7px">Score = histórico real (ventana 210 velas/TF, suavizado — muestra chica no grita) + sesgo + marco + estado + flujo + cercanía. Es síntesis mecánica: el juicio sigue siendo tuyo.</div></div>`;
+  h+=`<div class="sub nd" style="margin-top:8px">Score = histórico real (ventana 210 velas/TF, suavizado — muestra chica no grita) + sesgo + marco + estado + flujo + cercanía. Es síntesis mecánica: el juicio sigue siendo tuyo.</div></div>`;
   return h;
 }
 
-function fmtPatron(x){
+function fmtPatron(x, sinCabeza){
   const cu=t=>{const h=hcst(t);return `${h.dia} ${h.hm.slice(0,2)}:${h.hm.slice(2)}`;};
-  let s=`${x.tipo}${x.dir?` (${x.dir==="long"?"alcista":"bajista"})`:""} [${x.estado}]`;
+  let s=sinCabeza?"":`${x.tipo}${x.dir?` (${x.dir==="long"?"alcista":"bajista"})`:""} [${x.estado}]`;
   if(x.ini&&x.ini.t) s+=` desde ${cu(x.ini.t)}${x.ini.px!=null?` @${f(x.ini.px)}`:""}`;
   if(x.estado==="FORMÁNDOSE"||x.estado==="VIGENTE"||x.estado==="SEÑAL") s+=" hasta AHORA";
   if(x.zona&&!x.lineas) s+=` · zona ${f(x.zona[0])}–${f(x.zona[1])}`;
+  if(x.zona&&x.dir&&x.estado==="VIGENTE") s+=` · reacciona al tocar ${f(x.dir==="long"?x.zona[1]:x.zona[0])}`;
   if(x.nota) s+=` · ${x.nota}`;
   if(x.gatillo) s+=` · gatillo: ${x.gatillo}`;
   if(x.stop) s+=` · invalida: ${x.stop}`;
@@ -1030,19 +1364,30 @@ function fmtPatron(x){
   if(x.obj!=null&&!x.fin) s+=` · objetivo ${f(x.obj)}`;
   if(x.res!=null) s+=` (${x.res>=0?"+":""}${x.res.toFixed(2)}%)`;
   if(x.hist) s+=` · hist ${x.hist.w}/${x.hist.n} = ${x.hist.p}%${x.hist.n<5?" (⚠ muestra chica)":""}`;
-  return s;
+  return s.replace(/^ ?· /,"").trim();
 }
 
 function cardPatrones(D){
   if(!D.pat) return "";
   const tfs=Object.keys(D.pat); if(!tfs.length) return "";
-  let h='<div class="card"><h2>Patrones — activos (desde→hasta y cómo operar) · pasados (abrió→cerró)</h2>';
+  let h='<div class="card"><h2>Patrones · 45 tipos vigilados</h2><div class="sub" style="margin:-5px 0 11px">Activos: desde→hasta, zona y cómo operarlo · Pasados: dónde abrió y dónde cerró</div>';
+  let first=true;
   for(const tf of tfs){ const P=D.pat[tf];
     if(!P||!Array.isArray(P.act)||!Array.isArray(P.pas)) continue;   // guard
-    h+=`<div style="margin-bottom:9px"><div style="font-size:12px;font-weight:700;margin-bottom:2px">${tf}</div>`;
-    for(const x of P.act) h+=`<div class="sub" style="margin-bottom:4px"><span class="${x.dir==="long"?"up":x.dir==="short"?"dn":"nd"}">●</span> ${fmtPatron(x)}<br><span class="ac">→ ${PB[x.tipo]||""}</span></div>`;
-    for(const x of P.pas) h+=`<div class="sub nd" style="margin-bottom:3px">○ ${fmtPatron(x)}</div>`;
-    h+=`</div>`; }
+    h+=`<div style="${first?"":"border-top:1px solid var(--line);padding-top:11px;"}margin-bottom:12px">
+      <div style="font-size:11px;font-weight:750;color:var(--dim);letter-spacing:.7px;margin-bottom:8px">${tf.toUpperCase()}
+        <span style="color:var(--dim2);font-weight:650">· ${P.act.length} activo${P.act.length===1?"":"s"}${P.pas.length?` · ${P.pas.length} pasado${P.pas.length===1?"":"s"}`:""}</span></div>`;
+    for(const x of P.act){
+      const col=x.dir==="long"?"var(--ok)":x.dir==="short"?"var(--no)":"var(--dim2)";
+      const cls=x.dir==="long"?"up":x.dir==="short"?"dn":"nd";
+      h+=`<div style="margin:0 0 11px;padding-left:10px;border-left:2px solid ${col}">
+        <div style="font-size:13.5px;font-weight:700"><span class="${cls}">${x.tipo}${x.dir?` ${x.dir==="long"?"↑":"↓"}`:""}</span> <span class="pill" style="margin-left:4px">${x.estado}</span></div>
+        <div class="sub" style="margin-top:2px">${fmtPatron(x,true)}</div>
+        <div class="sub pbk" style="margin-top:4px">→ ${PB[x.tipo]||""}</div>
+      </div>`;
+    }
+    for(const x of P.pas) h+=`<div class="sub nd" style="margin:0 0 7px;padding-left:12px">○ ${fmtPatron(x)}</div>`;
+    h+=`</div>`; first=false; }
   h+='<div class="sub nd">Detección geométrica sobre velas cerradas — hipótesis a validar, no señales automáticas.</div>';
   return h+'</div>';
 }
@@ -1050,56 +1395,73 @@ function cardPatrones(D){
 // ─────────── v2.3: HERO de precio + sparkline con el plan encima ───────────
 // Un solo trazo (precio 15m cerrado); los niveles que tocan dinero se dibujan
 // como líneas de referencia con su etiqueta. Sin segundo eje, sin adorno.
-function sparkline(D, plan, G, SES){
+function sparkline(D, plan, G, SES, verd){
   const cr=D.v&&D.v["15m"]; if(!cr||cr.length<20) return "";
   const v=cerradas(cr).slice(-64), cs=v.map(x=>x.c);
-  const W=612, Hh=118, padL=6, padR=52, padT=10, padB=14;
+  const W=612, Hh=150, padL=6, padR=112, padT=10, padB=14;
   const iw=W-padL-padR, ih=Hh-padT-padB;
   // rango: precio + niveles visibles del plan (para que ninguno quede fuera)
+  const oper = !verd || verd==="OPERAR";    // sin veredicto explícito = plan pleno
   let lo=Math.min(...cs), hi=Math.max(...cs);
-  const lvls=[];
+  const lvls=[];                             // [nombre, px, color, dash, esPlan]
   if(G&&plan&&plan.entry){
-    lvls.push(["entrada",plan.entry,"var(--acc2)","4 3"]);
-    if(plan.stop) lvls.push(["stop",plan.stop,"var(--no)","5 4"]);
-    if(plan.tps&&plan.tps[0]) lvls.push(["TP1",plan.tps[0].px,"var(--ok)","5 4"]);
-    if(plan.tps&&plan.tps[1]) lvls.push(["TP2",plan.tps[1].px,"var(--ok)","2 4"]);
+    lvls.push(["entrada",plan.entry,"var(--acc2)","4 3",1]);
+    if(plan.stop) lvls.push(["stop",plan.stop,"var(--no)","6 4",1]);
+    if(plan.tps&&plan.tps[0]) lvls.push(["TP1",plan.tps[0].px,"var(--ok)","7 3",1]);
+    if(plan.tps&&plan.tps[1]) lvls.push(["TP2",plan.tps[1].px,"var(--ok)","3 4",1]);
+    if(plan.tps&&plan.tps[2]) lvls.push(["TP3",plan.tps[2].px,"var(--ok)","1 5",1]);
   }
-  if(SES&&SES.inval!=null) lvls.push(["invalida",SES.inval,"var(--warn)","2 3"]);
+  // niveles del SESGO en ámbar (la misma familia que su card): rompe / intensifica
+  if(SES&&SES.inval!=null) lvls.push(["rompe",SES.inval,"var(--warn)","2 3",0]);
+  if(SES&&SES.intens!=null) lvls.push(["intens",SES.intens,"var(--warn)","9 3",0]);
   for(const [,p] of lvls){ if(p<lo) lo=p; if(p>hi) hi=p; }
   const rng=(hi-lo)||1e-9; lo-=rng*0.06; hi+=rng*0.06;
   const X=i=>padL+iw*i/(cs.length-1);
   const Y=p=>padT+ih*(1-(p-lo)/(hi-lo));
   const path=cs.map((p,i)=>`${i?"L":"M"}${X(i).toFixed(1)},${Y(p).toFixed(1)}`).join("");
-  const alza=cs[cs.length-1]>=cs[0];
-  const col=alza?"var(--ok)":"var(--no)";
+  // Trazo del precio SIEMPRE en azul neutro (comité v2.5): con el precio en rojo,
+  // el stop —la línea que más dinero protege— era la que menos se distinguía.
+  // La dirección 24h ya la dice el % de arriba.
+  const col="var(--acc2)";
   const area=`${path}L${X(cs.length-1).toFixed(1)},${(Hh-padB)}L${padL},${(Hh-padB)}Z`;
-  // etiquetas del borde derecho con ANTI-COLISIÓN: los niveles del plan mandan;
-  // las gridlines pierden su texto si chocan; entre niveles se fuerza ≥11px.
-  const labs=[];   // {y, txt, color, lead, line}
-  for(const p of [Math.max(...cs),Math.min(...cs)])
-    labs.push({y:Y(p), txt:f(p), color:"var(--dim2)", lead:false, prio:0,
-      line:`<line x1="${padL}" x2="${W-padR}" y1="${Y(p).toFixed(1)}" y2="${Y(p).toFixed(1)}" stroke="var(--line)" stroke-width="1" opacity=".55"/>`});
-  for(const [n,p,c,d] of lvls)
-    labs.push({y:Y(p), txt:n, color:c, lead:true, prio:1,
-      line:`<line x1="${padL}" x2="${W-padR}" y1="${Y(p).toFixed(1)}" y2="${Y(p).toFixed(1)}" stroke="${c}" stroke-width="1.2" stroke-dasharray="${d}" opacity=".85"/>`});
+  // etiquetas del borde derecho con ANTI-COLISIÓN + swatch del dash de su línea
+  // + conector cuando la etiqueta quedó empujada lejos de su nivel.
+  const labs=[];
+  if(!lvls.length)                           // sin niveles: anclas de escala min/max
+    for(const p of [Math.max(...cs),Math.min(...cs)])
+      labs.push({y:Y(p), txt:f(p), color:"var(--dim2)", lead:false, prio:0, dash:null,
+        line:`<line x1="${padL}" x2="${W-padR}" y1="${Y(p).toFixed(1)}" y2="${Y(p).toFixed(1)}" stroke="var(--line)" stroke-width="1" opacity=".55"/>`});
+  for(const [n,p,c,d,esPlan] of lvls)
+    labs.push({y:Y(p), txt:`${n} ${f(p)}`, color:c, lead:true, prio:1, dash:d,
+      line:`<line x1="${padL}" x2="${W-padR}" y1="${Y(p).toFixed(1)}" y2="${Y(p).toFixed(1)}" stroke="${c}" stroke-width="1.2" stroke-dasharray="${d}" opacity="${esPlan&&!oper?".45":".85"}"/>`});
   labs.sort((a,b)=>a.y-b.y);
   let prevTy=-99;
   for(const L of labs){
-    L.ty=Math.max(L.y+3, padT+8);
-    if(L.ty-prevTy<11){
+    L.ty=Math.max(L.y+3, padT+9);
+    if(L.ty-prevTy<12){
       if(L.prio===0){ L.txt=null; continue; }        // gridline cede su texto
-      L.ty=prevTy+11;                                 // nivel: se empuja abajo
+      L.ty=prevTy+12;                                 // nivel: se empuja abajo
     }
     if(L.ty>Hh-3) L.ty=Hh-3;
     prevTy=L.ty;
   }
-  const gl=labs.map(L=>L.line+(L.txt?`<text x="${W-padR+4}" y="${L.ty.toFixed(1)}"${L.lead?` fill="${L.color}" class="lead"`:""}>${L.txt}</text>`:"")).join("");
+  const gl=labs.map(L=>{
+    if(!L.txt) return L.line;
+    let s=L.line;
+    if(L.dash){
+      s+=`<line x1="${W-padR+3}" x2="${W-padR+14}" y1="${(L.ty-3).toFixed(1)}" y2="${(L.ty-3).toFixed(1)}" stroke="${L.color}" stroke-width="1.6" stroke-dasharray="${L.dash}"/>`;
+      if(Math.abs(L.ty-3-L.y)>5)
+        s+=`<line x1="${W-padR}" x2="${W-padR+3}" y1="${L.y.toFixed(1)}" y2="${(L.ty-3).toFixed(1)}" stroke="${L.color}" stroke-width="1" opacity=".35"/>`;
+      s+=`<text x="${W-padR+17}" y="${L.ty.toFixed(1)}" fill="${L.color}" class="lead">${L.txt}</text>`;
+    } else s+=`<text x="${W-padR+4}" y="${L.ty.toFixed(1)}">${L.txt}</text>`;
+    return s;
+  }).join("");
   const refs="";
   const lastX=X(cs.length-1).toFixed(1), lastY=Y(cs[cs.length-1]).toFixed(1);
   const datos=cs.map(p=>+p.toFixed(6)).join(",");
   const horas=v.map(x=>{const h=hcst(x.t);return h.hm;}).join(",");
   return `<svg class="spark" viewBox="0 0 ${W} ${Hh}" preserveAspectRatio="none"
-      data-cs="${datos}" data-hs="${horas}" data-lo="${lo}" data-hi="${hi}"
+      data-cs="${datos}" data-hs="${horas}" data-lo="${lo}" data-hi="${hi}" data-hh="${Hh}"
       data-padl="${padL}" data-padr="${padR}" data-padt="${padT}" data-padb="${padB}">
     <defs><linearGradient id="gA" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="${col}" stop-opacity=".22"/>
@@ -1118,8 +1480,17 @@ function sparkline(D, plan, G, SES){
   </svg>`;
 }
 
-function heroCard(D, plan, G, SES){
+function heroCard(D, plan, G, SES, verd){
   const chg=D.chg, cc=chg>=0?"up":"dn";
+  // comité v2.5: el chart publicaba un plan sin decir su DIRECCIÓN ni si el
+  // veredicto lo respalda — un short tentativo se podía leer como niveles del
+  // long abierto. El badge lo dice antes de que el ojo llegue a las líneas.
+  const oper=!verd||verd==="OPERAR";
+  let badge="";
+  if(G&&plan&&plan.entry)
+    badge=`<span class="pill" style="font-weight:750;${oper?"color:var(--ok);border-color:rgba(47,209,140,.45)":"color:var(--warn);border-color:rgba(245,177,61,.45)"}">plan ${G.d==="long"?"LONG ↑":"SHORT ↓"}${oper?" · activo":" · tentativo — no ejecutar aún"}</span>`;
+  else if(verd)
+    badge=`<span class="pill">sin setup auto — el gráfico marca los niveles del sesgo</span>`;
   return `<div class="hero">
     <div class="l1">
       <span class="px">${f(D.mark)}</span>
@@ -1127,7 +1498,8 @@ function heroCard(D, plan, G, SES){
       <span style="flex:1"></span>
       <span class="sub" style="margin:0">últimas 16 h · 15m</span>
     </div>
-    ${sparkline(D, plan, G, SES)}
+    ${badge?`<div style="margin-top:8px">${badge}</div>`:""}
+    ${sparkline(D, plan, G, SES, verd)}
     <div class="meta">
       <span>vol 24h ${vk(D.vol)}</span>
       <span>OI ${D.oiUsd?vk(D.oiUsd)+" USD":vk(D.oi)}${D.oiChg!=null?" · "+pct(D.oiChg):""}</span>
@@ -1146,7 +1518,7 @@ function wireSpark(){
   if(cs.length<2) return;
   const lo=+s.dataset.lo, hi=+s.dataset.hi;
   const padL=+s.dataset.padl, padR=+s.dataset.padr, padT=+s.dataset.padt, padB=+s.dataset.padb;
-  const W=612, Hh=118, iw=W-padL-padR, ih=Hh-padT-padB;
+  const W=612, Hh=+s.dataset.hh||118, iw=W-padL-padR, ih=Hh-padT-padB;
   const g=s.querySelector(".hov"), ln=g.querySelector("line"),
         ci=g.querySelector("circle"), tx=g.querySelector("text");
   const move=e=>{
@@ -1222,7 +1594,9 @@ function calcularCalidad(setup, tfSig, dir, ls, contra8, atrPct, sesion, conflic
 // mercado. De ahí que "a dónde va todo" nunca quedara claro.
 // Aquí el mercado vota PRIMERO, con jerarquía: manda el TF grande. El setup solo
 // dice DÓNDE entrar; el sesgo dice HACIA DÓNDE.
-const PESO_TF = {"1d":4, "4h":3, "1h":2, "15m":1};
+// v2.5: TODAS las temporalidades votan, con jerarquía intacta: 1m y 5m juntos
+// pesan 0.75 contra 10 de los marcos grandes — afinan, no mandan.
+const PESO_TF = {"1d":4, "4h":3, "1h":2, "15m":1, "5m":0.5, "1m":0.25};
 
 function sesgoTF(v){
   if(!v || v.length<60) return null;
@@ -1290,7 +1664,28 @@ function calcularSesgo(D){
     if(arr.length){ inval=arr[arr.length-1][1]; invalTf=tf; break; }
   }
 
+  // v2.5 — nivel que INTENSIFICA la lectura: el swing del lado de la tendencia
+  // que, si se rompe, confirma continuación (el espejo del de invalidación)
+  let intens=null, intensTf=null, intensNota=null;
+  for(const tf of ["4h","1h"]){
+    const cr=D.v[tf]; if(!cr) continue;
+    const v2=cerradas(cr).slice(0,-1);
+    const [hi2,lo2]=swings(v2,3);
+    const arr = dir==="long" ? hi2 : lo2;
+    if(!arr.length) continue;
+    const cand=arr.map(q=>q[1]).filter(p=>dir==="long"?p>D.mark:p<D.mark);
+    if(cand.length){
+      intens = dir==="long"?Math.min(...cand):Math.max(...cand);
+      intensTf=tf; intensNota=`${dir==="long"?"máximo":"mínimo"} de ${tf} más cercano por delante`;
+    } else {
+      intens = dir==="long"?Math.max(...v2.map(q=>q.h)):Math.min(...v2.map(q=>q.l));
+      intensTf=tf; intensNota=`extremo del tramo de ${tf} — ya en ${dir==="long"?"máximos":"mínimos"}: cada cierre más allá extiende`;
+    }
+    break;
+  }
+
   return {score, abs, dir, grado, etiqueta, det, disc, inval, invalTf,
+          intens, intensTf, intensNota,
           operable: grado!=="sin rumbo"};
 }
 
@@ -1485,21 +1880,25 @@ function render(D, eq, estilo, E, sym){
     const ancho=Math.min(50,Math.abs(SES.score)/2);
     const izq = SES.score>=0 ? 50 : 50-ancho;
     H.push(`<div class="sesgo ${cls}">
-      <div class="lbl">Sesgo del mercado · 1d → 15m</div>
+      <div class="lbl">Sesgo del mercado · 1d→1m (manda el grande)</div>
       <div class="dir" style="color:${col}">${SES.etiqueta}</div>
       <div class="fza">fuerza <b>${SES.abs}</b>/100 · ${SES.grado}${
-        SES.disc.length?` · ${SES.disc.join(" y ")} en contra`:" · todos los marcos de acuerdo"}</div>
+        SES.disc.length?` · ${SES.disc.join(", ")} en contra`:" · todos los marcos de acuerdo"}</div>
       <div class="bar"><i style="left:${izq}%;width:${ancho}%;background:${col}"></i><span class="mid"></span></div>
-      <div class="tfrow">${["1d","4h","1h","15m"].map(tf=>{
+      <div class="tfrow">${["1d","4h","1h","15m","5m","1m"].map(tf=>{
         const r=SES.det[tf];
         if(!r) return `<div><span>${tf}</span><span class="nd">s/d</span></div>`;
         const c=r.s>0.12?"up":r.s<-0.12?"dn":"nd";
         return `<div><span>${tf}</span><span class="${c}">${r.s>0.12?"ALZA":r.s<-0.12?"BAJA":"PLANO"}</span></div>`;
       }).join("")}</div>
-      ${SES.inval!=null?`<div class="sub" style="margin-top:8px">
-        Esta lectura se rompe si ${SES.dir==="long"?"pierde":"recupera"} <b>${f(SES.inval)}</b>
+      ${SES.inval!=null?`<div class="sub" style="margin-top:9px">
+        ✕ Se <b>rompe</b> si ${SES.dir==="long"?"pierde":"recupera"} <b class="wa">${f(SES.inval)}</b>
         (último ${SES.dir==="long"?"mínimo":"máximo"} de ${SES.invalTf}, a ${
-        (Math.abs(D.mark-SES.inval)/D.mark*100).toFixed(2)}% de aquí)</div>`:""}
+        (Math.abs(D.mark-SES.inval)/D.mark*100).toFixed(2)}% de aquí) — ese es el nivel
+        «invalida» del gráfico: ahí esta lectura deja de valer y se replantea todo</div>`:""}
+      ${SES.intens!=null?`<div class="sub" style="margin-top:4px">
+        ⚡ Se <b>intensifica</b> si ${SES.dir==="long"?"supera":"pierde"} <b class="${SES.dir==="long"?"up":"dn"}">${f(SES.intens)}</b>
+        (${SES.intensNota}, a ${(Math.abs(D.mark-SES.intens)/D.mark*100).toFixed(2)}% de aquí)</div>`:""}
     </div>`);
   }
 
@@ -1508,17 +1907,20 @@ function render(D, eq, estilo, E, sym){
   // Tus datos dicen que es justo donde se pierde el dinero, así que ahora lo sabe.
   // Solo aparece si hay algo que decir: si vas limpio, no te roba la pantalla.
   const RANK=rankPatrones(D, SES);        // v2.4: ¿cuál estructura sigo?
-  H.push(cardLider(RANK));
+  H.push(cardLider(RANK,D));
   H.push(alertasDeRiesgo(now, eq));
 
   // ═══ VEREDICTO ═══
   let bloqueos=[], avisos=[], plan=null, calidad=null, calidadDet=null;
 
   if(!G){
-    H.push(vcard("no","SIN ENTRADA","ningún setup detectable ahora — el sesgo de arriba sigue siendo válido para cuando aparezca"));
-    H.push(`<div class="card"><div class="sub">Los detectores automáticos cubren 7 patrones.
-      CHoCH+OB, OB-HTF, Wyckoff, Three-Drives y Range-HVN son SEMI o MANUAL: si los ves
-      en tu gráfico, mándame captura con <b>opera</b> y los evalúo yo.</div></div>`);
+    H.push(vcard("wt","SIN ENTRADA","ningún setup detectable ahora — el sesgo de arriba sigue siendo válido para cuando aparezca"));
+    H.push(`<details><summary>¿Por qué sin entrada? · setups y catálogo</summary><div class="inner">
+      <div class="sub" style="padding-top:2px">Setups de <b>entrada</b> automáticos: 7 (Sweep+Reclaim,
+      BOS+Retest, FVG, EQH/EQL, Mean-Reversion, Momentum-NY, Impulso+Pullback). Aparte, el
+      <b>catálogo de estructuras</b> vigila 45 tipos — está en la card de patrones, abajo.
+      CHoCH+OB, OB-HTF, Wyckoff, Three-Drives y Range-HVN siguen siendo SEMI o MANUAL: si los
+      ves en tu gráfico, mándame captura con <b>opera</b> y los evalúo yo.</div></div></details>`);
   } else {
     // Las confluencias se calculan ANTES de dimensionar: el escalon "CORE con 1
     // confluencia faltante -> riesgo 0.75%" tiene que afectar el TAMAÑO, y antes
@@ -1764,7 +2166,7 @@ function render(D, eq, estilo, E, sym){
           <div style="font-size:13px;font-weight:600">${c[1]}</div>
           <div class="sub">se activa · ${c[2]}</div>
           <div class="sub">se descarta · ${c[3]}</div>
-          <div class="sub ac">${(c[0]/mk*100>=0?"+":"")}${(c[0]/mk*100).toFixed(2)}% · ${(Math.abs(c[0])/a).toFixed(1)} ATR · ~${minsTxt(Math.abs(c[0])/(0.6*a)*tfH(tf)*60)} al ritmo actual</div>
+          <div class="sub" style="color:var(--dim)">${(c[0]/mk*100>=0?"+":"")}${(c[0]/mk*100).toFixed(2)}% · ${(Math.abs(c[0])/a).toFixed(1)} ATR · ~${minsTxt(Math.abs(c[0])/(0.6*a)*tfH(tf)*60)} al ritmo actual</div>
         </div>`).join("")}</div>`);
 
       // ── CUÁNDO VOLVER: el checkpoint mas cercano que puede CAMBIAR el veredicto ──
@@ -1803,7 +2205,7 @@ function render(D, eq, estilo, E, sym){
   H.push(tarjetaSesion(now));
 
   // el panel plegable: todo lo que antes competía por tu atención
-  H.push(`<details><summary>Ver el detalle — mercado, posicionamiento, multi-TF, setups, calidad</summary>
+  H.push(`<details><summary>Ver el detalle técnico</summary>
     <div class="inner">${DETALLE.join("")}
     <div class="card"><h2>Lo que esto sigue sin saber</h2>
       <div class="sub">· si existe plan W1 y si este par está en la watchlist de hoy</div>
@@ -1835,7 +2237,8 @@ function render(D, eq, estilo, E, sym){
 
   H.push(cardPatrones(D));   // v2.2: patrones activos/pasados
   // v2.3: rellenar el hero ya con el plan calculado
-  const _hero=heroCard(D, (typeof plan!=="undefined"?plan:null), G, SES);
+  const _hero=heroCard(D, (typeof plan!=="undefined"?plan:null), G, SES,
+    (!G?"SIN SETUP":(bloqueos.length?"NO OPERAR":"OPERAR")));
   $("#out").innerHTML=H.join("").replace("__HERO__",_hero);
   wireSpark();
   $("#clock").textContent=now.toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"})+" · "+ses;
@@ -1873,7 +2276,7 @@ function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8){
   // que parece una contradicción y hace desconfiar de la herramienta
   if(TICK/a > TICK_ATR_MAX){ p.bloq.push(`el tick (${TICK}) es el ${(TICK/a*100).toFixed(0)}% del ATR de ${G.tf}: este símbolo no puede expresar un stop con precisión en este TF`); return p; }
   if(ticks<TICKS_MIN){ p.bloq.push(`stop de ${ticks.toFixed(1)} ticks (mínimo ${TICKS_MIN}): la cuantización distorsionaría el R:R`); return p; }
-  const topeStop={scalp:0.015,intraday:0.04}[estilo];
+  const topeStop={scalp:0.015,intraday:0.04,swing:0.08}[estilo];
   if(stopPct>topeStop){ p.bloq.push(`stop ${(stopPct*100).toFixed(2)}% supera el tope de ${topeStop*100}% para ${estilo}`); return p; }
   if(Math.abs(entry-stop)>2.5*a){ p.bloq.push(`stop de ${(Math.abs(entry-stop)/a).toFixed(1)} ATR: demasiado ancho para este setup`); return p; }
 
@@ -2000,7 +2403,7 @@ function dimensionar(D,G,eq,riesgo,estilo,E,TC,sym,contra,contra8){
   const ref=p.tps[1];
   if(ref.etaH>E.maxH*1.5) p.avisos.push(`ETA a TP2 ~${ref.etaH.toFixed(1)}h excede el horizonte de ${estilo} (${E.maxH}h): o lo operas como intraday, o cierras el runner al cumplirse ${E.maxH}h`);
   if(contra8!==null&&contra8>FUND_NO) p.bloq.push(`funding ${contra8.toFixed(4)}% base-8h PROHIBITIVO contra el trade`);
-  else if(contra8!==null&&contra8>FUND_OK) p.avisos.push(`funding ${contra8.toFixed(4)}% base-8h ALERTA: no mantener más de 4h`);
+  else if(contra8!==null&&contra8>FUND_OK) p.avisos.push(`funding ${contra8.toFixed(4)}% base-8h ALERTA: ${estilo==="swing"?"en swing lo pagas varias veces — ya está restado en los R netos, pero pesa":"no mantener más de 4h"}`);
   // E.rr sigue vivo, pero aplicado donde tiene sentido con la escalera nueva: al
   // runner. TP1 ya no puede cumplirlo porque vale 1R por diseño.
   if(tp3.rn<E.rr) p.bloq.push(`ni el runner alcanza el R:R mínimo del estilo ${estilo} (${tp3.rn.toFixed(2)}R &lt; ${E.rr}): el recorrido disponible no paga este stop`);
@@ -2033,9 +2436,10 @@ function textoParaClaude(modo){
   if(posTxt) L.push(`POSICIÓN ABIERTA (declarada por mí): ${posTxt}`);
   // El SESGO va primero: es la lectura que ordena todo lo demas.
   if(SES) L.push(`SESGO ${SES.etiqueta} · fuerza ${SES.abs}/100 (${SES.grado}) · `
-    + ["1d","4h","1h","15m"].filter(t=>SES.det[t]).map(t=>`${t}${SES.det[t].s>0.12?"↑":SES.det[t].s<-0.12?"↓":"→"}`).join(" ")
+    + ["1d","4h","1h","15m","5m","1m"].filter(t=>SES.det[t]).map(t=>`${t}${SES.det[t].s>0.12?"↑":SES.det[t].s<-0.12?"↓":"→"}`).join(" ")
     + (SES.disc.length?` · en contra: ${SES.disc.join(",")}`:" · sin discrepancias")
-    + (SES.inval!=null?` · se invalida si ${SES.dir==="long"?"pierde":"recupera"} ${f(SES.inval)} (${SES.invalTf})`:""));
+    + (SES.inval!=null?` · se invalida si ${SES.dir==="long"?"pierde":"recupera"} ${f(SES.inval)} (${SES.invalTf})`:"")
+    + (SES.intens!=null?` · se intensifica si ${SES.dir==="long"?"supera":"pierde"} ${f(SES.intens)} (${SES.intensTf})`:""));
   // estado de sesion: lo que Binance no puede decirle a nadie
   const _ops=leerSesion(new Date()).ops;
   if(_ops.length){ let _r=0,_ra=0;
@@ -2058,6 +2462,11 @@ function textoParaClaude(modo){
   const lb=libroLineas(D, plan, FULL); if(lb) L.push(lb);
   // niveles S/R por swings de 4h/1h (análisis y full)
   if(AN){ const sr=nivelesSR(D); if(sr) L.push(`S/R por swings: ${sr}`); }
+  // v2.5: contexto del radar de watchlist, si hay un escaneo fresco (<15 min)
+  if(AN&&RADAR.rows&&RADAR.ts&&Date.now()-RADAR.ts<15*60e3){
+    const rs=RADAR.rows.filter(r=>r.score>=0).slice(0,3);
+    if(rs.length) L.push(`RADAR WATCHLIST (escaneo ligero 15m/1h/4h, hace ${((Date.now()-RADAR.ts)/60000).toFixed(0)}min): `+rs.map((r,i)=>`${i+1}º ${r.m} ${r.score.toFixed(1)}/10${r.L?` (${r.L.x.tipo}${r.L.x.dir?" "+r.L.x.dir:""} ${r.L.tf} [${r.L.x.estado}])`:""}`).join(" · "));
+  }
   // v2.4: la estructura líder — la síntesis de TODOS los marcos — abre la sección
   const RK=LAST.RANK||[];
   if(RK.length){
@@ -2141,27 +2550,47 @@ setInterval(()=>{ const b=$("#fresh"); if(!b) return;
 // se suspende a los pocos minutos: sirve para una sesión activa (dejas el móvil
 // con la app abierta), NO para avisarte dormido. Wake Lock mantiene la pantalla
 // encendida mientras dure la sesión para que el polling no muera.
-let AVISOS=false, WAKE=null, ULTIMO_VER=null, ZONA_AVISADA=false;
+let AVISOS=false, WAKE=null, ULTIMO_VER=null, ZONA_AVISADA=false, SW_REG=null;
+// iOS solo permite pedir permiso de notificación con la app INSTALADA en la
+// pantalla de inicio (16.4+), y ahí `new Notification()` no existe: se notifica
+// vía service worker. El sw.js no cachea nada — los datos siguen 100% vivos.
+const esIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+const esApp=()=>(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)||navigator.standalone===true;
+if("serviceWorker" in navigator){ try{ navigator.serviceWorker.register("./sw.js").then(r=>{SW_REG=r;}).catch(()=>{}); }catch(e){} }
 async function toggleAvisos(){
   const info=$("#alinfo"), b=$("#al");
   if(AVISOS){ AVISOS=false; if(WAKE){ try{await WAKE.release()}catch(e){} WAKE=null; }
-    b.textContent="🔔 Avisarme"; b.style.color=""; info.style.display="none"; return; }
+    b.textContent="🔔"; b.style.color=""; info.style.display="none"; return; }
+  // iPhone/iPad fuera de la app instalada: el permiso NI SIQUIERA existe ahí
+  if(esIOS()&&!esApp()){
+    info.style.display="block";
+    info.innerHTML='<b class="wa">En iPhone los avisos solo funcionan instalando la app:</b> '+
+      'Safari → botón <b>Compartir</b> → <b>Añadir a pantalla de inicio</b> → abre <b>Perp WLD</b> '+
+      'desde el icono nuevo → toca 🔔 otra vez y acepta el permiso. (Requiere iOS 16.4+.)';
+    return; }
   if(!("Notification" in window)){
     info.style.display="block";
-    info.innerHTML='<span class="wa">Este navegador no soporta notificaciones. En iPhone: añade la app a la pantalla de inicio y ábrela desde ahí.</span>';
+    info.innerHTML='<span class="wa">Este navegador no soporta notificaciones.</span>';
     return; }
   let perm=Notification.permission;
   if(perm==="default") perm=await Notification.requestPermission();
   if(perm!=="granted"){
     info.style.display="block";
-    info.innerHTML='<span class="wa">Permiso denegado. Actívalo en los ajustes del navegador para este sitio.</span>';
+    info.innerHTML='<span class="wa">Permiso denegado. Actívalo en los ajustes del navegador/sistema para este sitio.</span>';
     return; }
+  // asegurar el service worker (canal de notificación en iOS; también sirve en Android/desktop)
+  if("serviceWorker" in navigator && !SW_REG){
+    try{ SW_REG=await Promise.race([navigator.serviceWorker.register("./sw.js"),
+      new Promise((_,j)=>setTimeout(()=>j(new Error("sw timeout")),2000))]); }catch(e){}
+  }
   AVISOS=true; b.textContent="🔔 Vigilando"; b.style.color="var(--ok)";
   try{ if("wakeLock" in navigator) WAKE=await navigator.wakeLock.request("screen"); }catch(e){}
   info.style.display="block";
   info.innerHTML=`Te aviso en cuanto el veredicto pase a <b>OPERAR</b> o el precio toque una zona vigilada.
-    <span class="wa">Funciona mientras esta pestaña siga viva</span> — si el móvil la suspende, deja de vigilar.
-    ${WAKE?"Pantalla mantenida encendida.":""}`;
+    ${SW_REG?"Avisos por el sistema (service worker)":"<span class=wa>Sin service worker: aviso simple del navegador</span>"} ·
+    <span class="wa">vigila mientras la app esté abierta</span> — sin servidor no hay push con la app cerrada.
+    ${WAKE?"Pantalla mantenida encendida para que el reloj no muera.":""}
+    ${esIOS()?"En iPhone: mantén la app al frente o con pantalla encendida — iOS congela apps en segundo plano.":""}`;
 }
 // re-adquirir el wake lock al volver a la pestaña (el SO lo suelta al ocultarla)
 document.addEventListener("visibilitychange", async()=>{
@@ -2169,14 +2598,91 @@ document.addEventListener("visibilitychange", async()=>{
     try{ WAKE=await navigator.wakeLock.request("screen"); }catch(e){} }
 });
 function avisar(titulo, cuerpo){
-  if(!AVISOS || Notification.permission!=="granted") return;
-  try{ const n=new Notification(titulo,{body:cuerpo, tag:"perp-"+SYM, renotify:true,
-        icon:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>"});
-    n.onclick=()=>{ window.focus(); n.close(); };
-  }catch(e){}
+  if(!AVISOS || !("Notification" in window) || Notification.permission!=="granted") return;
+  const opts={body:cuerpo, tag:"perp-"+SYM, renotify:true, icon:"apple-touch-icon.png",
+    badge:"apple-touch-icon.png"};
+  try{
+    if(SW_REG&&SW_REG.showNotification){ SW_REG.showNotification(titulo,opts); }   // iOS y PWAs
+    else{ const n=new Notification(titulo,opts); n.onclick=()=>{ window.focus(); n.close(); }; }
+  }catch(e){ try{ if(SW_REG&&SW_REG.showNotification) SW_REG.showNotification(titulo,opts); }catch(_){} }
   try{ navigator.vibrate && navigator.vibrate([220,90,220]); }catch(e){}
 }
 $("#al").onclick=toggleAvisos;
+
+// ═══════════ v2.5: RADAR DE WATCHLIST — ¿qué moneda tiene el mejor setup? ═══════════
+// Escaneo LIGERO bajo demanda (botón): velas 15m/1h/4h + ticker por moneda —
+// sin OI, sin L/S, sin libro (eso lo da el análisis completo al elegirla).
+// Puntúa el MISMO motor de siempre: detectarPatrones + calcularSesgo +
+// rankPatrones; "limpio" = todos los marcos del sesgo de acuerdo (+0.5).
+// Los precios usan precisión propia (el TICK global es de la moneda elegida).
+const RADAR={ts:null,rows:null};
+const fRad=x=>x==null||!isFinite(x)?"—":x>=1000?x.toFixed(1):x>=100?x.toFixed(2):x>=1?x.toFixed(3):x.toFixed(4);
+async function radarScan(){
+  const btn=$("#rdBtn"), out=$("#rdOut");
+  btn.disabled=true; btn.textContent="📡 escaneando…";
+  out.innerHTML=`<div class="sub" style="margin-top:8px"><span class="spin"></span> ${MONEDAS.length} monedas · velas 15m/1h/4h…</div>`;
+  const rows=[];
+  await Promise.all(MONEDAS.map(async m=>{
+    try{
+      const s=m+"USDT";
+      const [k15,k1,k4,t24]=await Promise.all([
+        get("/fapi/v1/klines",{symbol:s,interval:"15m",limit:210}),
+        get("/fapi/v1/klines",{symbol:s,interval:"1h",limit:210}),
+        get("/fapi/v1/klines",{symbol:s,interval:"4h",limit:210}),
+        get("/fapi/v1/ticker/24hr",{symbol:s})]);
+      const map=k=>k.map(x=>({t:x[0],o:+x[1],h:+x[2],l:+x[3],c:+x[4],vol:+x[5],tbv:+x[9]}));
+      const Dm={v:{"15m":map(k15),"1h":map(k1),"4h":map(k4)}};
+      Dm.mark=+t24.lastPrice; Dm.chg=+t24.priceChangePercent; Dm.vol=+t24.quoteVolume;
+      const pd=detectarPatrones(Dm); Dm.pat=pd.tfs;
+      const S=calcularSesgo(Dm);
+      const R=rankPatrones(Dm,S);
+      if(!R.length){ rows.push({m,score:0,txt:"sin estructura activa",S,chg:Dm.chg}); return; }
+      const L0=R[0];
+      const limpio=S&&!S.disc.length&&S.grado!=="sin rumbo";
+      rows.push({m,score:Math.min(10,L0.score+(limpio?0.5:0)),L:L0,S,limpio,chg:Dm.chg});
+    }catch(e){ rows.push({m,score:-1,txt:(e.message||"error").slice(0,60)}); }
+  }));
+  rows.sort((a,b)=>b.score-a.score);
+  RADAR.ts=Date.now(); RADAR.rows=rows;
+  pintarRadar();
+  btn.disabled=false; btn.textContent="📡 Escanear";
+}
+function pintarRadar(){
+  const out=$("#rdOut"); if(!RADAR.rows){ out.innerHTML=""; return; }
+  const rs=RADAR.rows.filter(r=>r.score>=0), err=RADAR.rows.filter(r=>r.score<0);
+  if(!rs.length){ out.innerHTML=`<div class="sub wa" style="margin-top:8px">ninguna moneda devolvió datos${err.length?` (${err[0].txt})`:""}</div>`; return; }
+  const W0=rs[0]; let h="";
+  if(W0.L){
+    const x=W0.L.x;
+    const lvl = x.gatillo?`gatillo: ${x.gatillo}`
+      : x.zona?`reacciona en ${fRad(x.dir==="long"?x.zona[1]:x.zona[0])} (zona ${fRad(x.zona[0])}–${fRad(x.zona[1])})`
+      : x.obj!=null?`objetivo ${fRad(x.obj)}`:"";
+    h+=`<div style="margin-top:11px;padding:12px 13px;border:1px solid rgba(47,209,140,.35);border-radius:10px;background:var(--ok-soft)">
+      <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">
+        <span style="font-size:17px;font-weight:800">🥇 ${W0.m}</span>
+        <span class="pill">score ${W0.score.toFixed(1)}/10</span>
+        ${W0.limpio?`<span class="pill" style="color:var(--ok);border-color:rgba(47,209,140,.4)">limpio · marcos de acuerdo</span>`:""}
+        <span style="flex:1"></span>
+        <span class="${W0.chg>=0?"up":"dn"}" style="font-size:12px;font-weight:700">${pct(W0.chg)} 24h</span></div>
+      <div class="sub" style="margin-top:5px">${x.tipo}${x.dir?` (${x.dir==="long"?"alcista":"bajista"})`:""} · ${W0.L.tf} · [${x.estado}]${lvl?` · ${lvl}`:""}${x.obj!=null&&x.zona?` · objetivo ${fRad(x.obj)}`:""}${x.hist?` · hist ${x.hist.w}/${x.hist.n}=${x.hist.p}%`:""}</div>
+      <div class="sub">sesgo ${W0.S?`${W0.S.etiqueta} ${W0.S.abs}/100`:"s/d"}${W0.L.por.length?` · ${W0.L.por.slice(0,3).join(" · ")}`:""}</div>
+      <button class="go" data-rd="${W0.m}" style="margin-top:9px;width:auto;padding:8px 16px">Análisis completo de ${W0.m} →</button>
+    </div>`;
+  }
+  if(rs.length>1) h+=`<div style="margin-top:9px">`+rs.slice(1).map(r=>{
+    const x=r.L&&r.L.x;
+    return `<div class="kv" style="cursor:pointer" data-rd="${r.m}"><span class="k"><span class="pill" style="min-width:64px;text-align:center">${r.m}</span> ${x?`${x.tipo}${x.dir?` (${x.dir==="long"?"↑":"↓"})`:""} · ${r.L.tf} [${x.estado}]`:(r.txt||"—")}</span><span class="v ${r.score>=6?"up":r.score>=4?"nd":"dn"}">${r.score.toFixed(1)}</span></div>`;
+  }).join("")+`</div>`;
+  if(err.length) h+=`<div class="sub wa" style="margin-top:6px">sin datos: ${err.map(r=>r.m).join(", ")}</div>`;
+  h+=`<div class="sub nd" style="margin-top:9px">Escaneo ligero (estructura + sesgo por velas cerradas; sin OI/flujo/libro). El score compara la MEJOR estructura de cada moneda con el mismo motor del ranking «¿cuál sigo?». El veredicto operable lo da el análisis completo. · ${new Date(RADAR.ts).toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"})}</div>`;
+  out.innerHTML=h;
+  out.querySelectorAll("[data-rd]").forEach(el=>el.onclick=()=>{
+    const c=document.querySelector(`.chip[data-m="${el.dataset.rd}"]`);
+    if(c) c.click(); else { SYM=el.dataset.rd; TICK=null; tick(true); }
+    window.scrollTo({top:0,behavior:"smooth"});
+  });
+}
+$("#rdBtn").onclick=radarScan;
 
 // ───────────────────────────── UI ─────────────────────────────
 // ═══════════ ESTADO DE SESIÓN — los gates que tus propios datos piden ═══════════
@@ -2289,12 +2795,14 @@ function tarjetaSesion(now){
     <div class="sub" style="margin-top:6px">Marca cada cierre y la app deja de estar
       ciega a lo único que no puede ver de Binance.
       <a href="#" onclick="borrarSesion();return false" style="color:var(--dim2)">reiniciar el día</a></div>
-    <div class="sub" style="margin-top:7px;border-top:1px solid var(--line);padding-top:7px">
-      Nota honesta sobre tu historial: el <b>número</b> de operaciones al día NO predice
-      el resultado — tus tres días verdes de jun–jul tuvieron 37, 36 y 41 cierres, y los
-      rojos 23, 30 y 21. Lo que sí predice es el <b>tamaño de la pérdida</b>: tu pérdida
-      media fue 38.10 USDT contra un riesgo nominal de 22.50 (1.69R). Perdías más de lo
-      que creías arriesgar. Por eso el contador de arriba mide R, no operaciones.</div>
+    <details style="background:none;border:0;box-shadow:none;margin:7px 0 0;border-radius:0;border-top:1px solid var(--line)">
+      <summary style="padding:8px 0 2px;font-size:10.5px">Nota sobre tu historial · por qué esto mide R</summary>
+      <div class="sub" style="padding:4px 0 2px">
+      El <b>número</b> de operaciones al día NO predice el resultado — tus tres días verdes
+      de jun–jul tuvieron 37, 36 y 41 cierres, y los rojos 23, 30 y 21. Lo que sí predice
+      es el <b>tamaño de la pérdida</b>: tu pérdida media fue 38.10 USDT contra un riesgo
+      nominal de 22.50 (1.69R). Perdías más de lo que creías arriesgar. Por eso el contador
+      de arriba mide R, no operaciones.</div></details>
   </div>`;
 }
 
@@ -2333,7 +2841,7 @@ async function tick(forzar){
 let temporizador=null;
 function programar(){
   clearTimeout(temporizador);
-  const periodo=($("#st").value==="scalp"?30:75)*1000;
+  const periodo=({scalp:30,intraday:75,swing:150}[$("#st").value]||75)*1000;
   temporizador=setTimeout(()=>tick(false), periodo);
 }
 tick(true);
