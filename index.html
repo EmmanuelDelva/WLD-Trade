@@ -242,12 +242,13 @@
   <div class="chips" id="chips"></div>
 
   <div class="card" id="rdCard" style="padding:12px 14px">
-    <div style="display:flex;align-items:center;gap:10px">
-      <div style="flex:1;min-width:0">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
         <div style="font-size:13px;font-weight:750">Radar de la watchlist</div>
-        <div class="sub">¿cuál de tus monedas tiene el mejor setup ahora? Escaneo ligero 15m/1h/4h.</div>
+        <div class="sub">¿cuál de tus monedas tiene el mejor setup ahora? Escaneo ligero 15m/1h/4h · <b>Vigilar</b> repite cada 5 min y avisa: entrada ≥7.5/10 y cambio de sesgo de cualquier moneda.</div>
       </div>
       <button class="sec" id="rdBtn" style="width:auto;flex:0 0 auto">📡 Escanear</button>
+      <button class="sec" id="rdW" style="width:auto;flex:0 0 auto" title="escaneo cada 5 min con avisos: entrada ≥7.5/10 y cambios de sesgo de todas tus monedas">🔔 Vigilar</button>
     </div>
     <div id="rdOut"></div>
   </div>
@@ -268,10 +269,11 @@
       <input id="pos" placeholder="LONG 500 WLD @0.3081 · stop 0.3050 · abierta 18:40"></div>
   </div>
   <div class="row">
-    <button class="sec" id="cpP" title="pégalo con wldlivenow">📋 Pulso</button>
-    <button class="sec" id="cpA" title="pégalo con wldlive">📋 Análisis</button>
-    <button class="sec" id="cpF" title="pégalo con wldlivefull">📋 Full</button>
-    <button class="sec" id="al" style="flex:0 0 58px">🔔</button>
+    <button class="sec" id="cpP" title="pégalo con wldlivenow">Pulso</button>
+    <button class="sec" id="cpA" title="pégalo con wldlive">Análisis</button>
+    <button class="sec" id="cpF" title="pégalo con wldlivefull">Full</button>
+    <button class="sec" id="al" style="flex:0 0 46px;padding:9px 2px" title="avisos locales (app abierta)">🔔</button>
+    <button class="sec" id="ps" style="flex:0 0 46px;padding:9px 2px" title="push fase 2: recibir con la app cerrada">📲</button>
   </div>
   <div class="sub" style="margin:-4px 2px 8px;color:var(--dim)">
     Copia según el gatillo: <b>Pulso</b>→wldlivenow · <b>Análisis</b>→wldlive · <b>Full</b>→wldlivefull</div>
@@ -289,7 +291,14 @@
 <script>
 "use strict";
 // ═══════════════════════════════════════════════════════════════════════════
-// Perp WLD — operativa scalp/intraday/swing sin servidor. · v2.6
+// Perp WLD — operativa scalp/intraday/swing sin servidor*. · v2.7
+// v2.7 (2026-07-31): VIGÍA — alertas accionables por moneda+estilo con tags
+// separados (OPERAR, precio EN TU ENTRADA, TP1/TP2/TP3, STOP, CAMBIO DE SESGO;
+// estado persistente anti-repetición), radar con 🔔 VIGILAR (escaneo cada 5 min:
+// entradas ≥7.5/10 "no te la pierdas" + cambio de sesgo de TODA la watchlist) y
+// FASE 2: push relay opcional (push-server/ en Render + Web Push) — cualquier
+// dispositivo abierto genera; todos los suscritos reciben con la app cerrada.
+// *el único servidor (opcional) es el relay de push: NO toca Binance ni analiza.
 // v2.6 (2026-07-31): CATÁLOGO 45 TIPOS (+triples, three drives, taza con asa,
 // redondeos, divergencia de volumen, estrellas, soldados/cuervos, pinzas) con
 // umbrales endurecidos por comité (anti falso-positivo: gates de ubicación,
@@ -2221,19 +2230,25 @@ function render(D, eq, estilo, E, sym){
   // ── aviso: solo en TRANSICIÓN a operable, nunca repetido ──
   const verAhora = !G ? "sin-setup" : (bloqueos.length ? "bloqueado" : "OPERAR");
   if(ULTIMO_VER && ULTIMO_VER !== verAhora && verAhora === "OPERAR" && plan && plan.qty){
-    avisar(`${SYM} · OPERAR ${G.d.toUpperCase()}${SES?` · sesgo ${SES.etiqueta}`:""}`,
+    notificar(`${SYM} · ${estilo} · OPERAR ${G.d.toUpperCase()}${SES?` · sesgo ${SES.etiqueta}`:""}`,
       `${G.s} en ${G.tf} · entrada ${f(plan.entry)} · stop ${f(plan.stop)} · ${plan.lev}x · ` +
-      `TP1 ${f(plan.tps[0].px)} cierra 40% y sube el stop a ${f(plan.be)}`);
+      `TP1 ${f(plan.tps[0].px)} cierra 40% y sube el stop a ${f(plan.be)}`,
+      `op-${SYM}:${estilo}`);
   }
   // aviso secundario: el precio entró en una zona vigilada aunque aún no confirme
   if(ULTIMO_VER && G && bloqueos.length && G.z){
     const dentro = D.mark>=Math.min(...G.z) && D.mark<=Math.max(...G.z);
     if(dentro && !ZONA_AVISADA){ ZONA_AVISADA=true;
-      avisar(`${SYM} · precio en la zona`,
-        `${G.s} ${G.d.toUpperCase()} en ${G.tf}: el precio entró en ${f(Math.min(...G.z))}–${f(Math.max(...G.z))}. Falta el cierre que confirme.`);
+      notificar(`${SYM} · ${estilo} · precio en la zona`,
+        `${G.s} ${G.d.toUpperCase()} en ${G.tf}: el precio entró en ${f(Math.min(...G.z))}–${f(Math.max(...G.z))}. Falta el cierre que confirme.`,
+        `zona-${SYM}:${estilo}`);
     } else if(!dentro) ZONA_AVISADA=false;
   }
   ULTIMO_VER = verAhora;
+
+  // ═══ v2.7 VIGÍA: entrada tocada · TP1/2/3 · stop · cambio de sesgo ═══
+  const _als=evaluarAlertas(D,(plan&&plan.entry)?plan:null,G,SES,estilo,verAhora);
+  if(AVISOS||PUSH.on) for(const a of _als) notificar(a.titulo,a.cuerpo,a.tag);
 
   H.push(cardPatrones(D));   // v2.2: patrones activos/pasados
   // v2.3: rellenar el hero ya con el plan calculado
@@ -2556,7 +2571,14 @@ let AVISOS=false, WAKE=null, ULTIMO_VER=null, ZONA_AVISADA=false, SW_REG=null;
 // vía service worker. El sw.js no cachea nada — los datos siguen 100% vivos.
 const esIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
 const esApp=()=>(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)||navigator.standalone===true;
-if("serviceWorker" in navigator){ try{ navigator.serviceWorker.register("./sw.js").then(r=>{SW_REG=r;}).catch(()=>{}); }catch(e){} }
+if("serviceWorker" in navigator){ try{ navigator.serviceWorker.register("./sw.js").then(async r=>{ SW_REG=r;
+  // self-heal fase 2: si el relay se reinició (Render free pierde disco), re-mandar la suscripción
+  try{ if(localStorage.getItem("pushOn")==="1"){
+    const sub=await r.pushManager.getSubscription();
+    const u=localStorage.getItem("pushUrl"), k=localStorage.getItem("pushToken");
+    if(sub&&u&&k) fetch(u+"/subscribe",{method:"POST",headers:{"Content-Type":"application/json","x-token":k},
+      body:JSON.stringify({sub,ua:navigator.userAgent.slice(0,80)})}).catch(()=>{}); } }catch(e){}
+}).catch(()=>{}); }catch(e){} }
 async function toggleAvisos(){
   const info=$("#alinfo"), b=$("#al");
   if(AVISOS){ AVISOS=false; if(WAKE){ try{await WAKE.release()}catch(e){} WAKE=null; }
@@ -2586,7 +2608,7 @@ async function toggleAvisos(){
   AVISOS=true; b.textContent="🔔 Vigilando"; b.style.color="var(--ok)";
   try{ if("wakeLock" in navigator) WAKE=await navigator.wakeLock.request("screen"); }catch(e){}
   info.style.display="block";
-  info.innerHTML=`Te aviso en cuanto el veredicto pase a <b>OPERAR</b> o el precio toque una zona vigilada.
+  info.innerHTML=`Te aviso <b>por moneda y estilo</b> (etiquetas separadas): veredicto <b>OPERAR</b>, precio <b>en tu entrada</b>, <b>TP1/TP2/TP3</b>, <b>stop</b>, <b>cambio de sesgo</b> y zona vigilada — más el radar si activas 🔔 Vigilar.
     ${SW_REG?"Avisos por el sistema (service worker)":"<span class=wa>Sin service worker: aviso simple del navegador</span>"} ·
     <span class="wa">vigila mientras la app esté abierta</span> — sin servidor no hay push con la app cerrada.
     ${WAKE?"Pantalla mantenida encendida para que el reloj no muera.":""}
@@ -2597,9 +2619,9 @@ document.addEventListener("visibilitychange", async()=>{
   if(AVISOS && !document.hidden && "wakeLock" in navigator && !WAKE){
     try{ WAKE=await navigator.wakeLock.request("screen"); }catch(e){} }
 });
-function avisar(titulo, cuerpo){
+function avisar(titulo, cuerpo, tag){
   if(!AVISOS || !("Notification" in window) || Notification.permission!=="granted") return;
-  const opts={body:cuerpo, tag:"perp-"+SYM, renotify:true, icon:"apple-touch-icon.png",
+  const opts={body:cuerpo, tag:tag||("perp-"+SYM), renotify:true, icon:"apple-touch-icon.png",
     badge:"apple-touch-icon.png"};
   try{
     if(SW_REG&&SW_REG.showNotification){ SW_REG.showNotification(titulo,opts); }   // iOS y PWAs
@@ -2609,18 +2631,80 @@ function avisar(titulo, cuerpo){
 }
 $("#al").onclick=toggleAvisos;
 
+// ─────────── v2.7: reparto de avisos — local + push relay (fase 2) ───────────
+// notificar() es el ÚNICO punto de salida de alertas: muestra local (avisar) y,
+// si hay relay configurado, la reenvía para que TODOS tus dispositivos
+// suscritos la reciban aunque tengan la app cerrada. El relay no analiza nada.
+const PUSH={url:localStorage.getItem("pushUrl")||"", token:localStorage.getItem("pushToken")||"",
+  on:localStorage.getItem("pushOn")==="1"};
+function notificar(titulo,cuerpo,tag){
+  avisar(titulo,cuerpo,tag);
+  if(PUSH.url&&PUSH.token){
+    try{ fetch(PUSH.url+"/alert",{method:"POST",
+      headers:{"Content-Type":"application/json","x-token":PUSH.token},
+      body:JSON.stringify({t:titulo,b:cuerpo,tag})}).catch(()=>{}); }catch(e){}
+  }
+}
+const b64u=s=>{const p="=".repeat((4-s.length%4)%4);
+  const r=atob((s+p).replace(/-/g,"+").replace(/_/g,"/"));
+  return Uint8Array.from([...r].map(c=>c.charCodeAt(0)));};
+async function togglePush(){
+  const info=$("#alinfo"), b=$("#ps");
+  info.style.display="block";
+  if(PUSH.on){
+    try{ const sub=SW_REG&&await SW_REG.pushManager.getSubscription();
+      if(sub){ try{ fetch(PUSH.url+"/unsubscribe",{method:"POST",headers:{"Content-Type":"application/json","x-token":PUSH.token},body:JSON.stringify({endpoint:sub.endpoint})}).catch(()=>{}); }catch(e){}
+        await sub.unsubscribe(); } }catch(e){}
+    PUSH.on=false; localStorage.setItem("pushOn","0");
+    b.textContent="📲"; b.style.color="";
+    info.innerHTML="Push desactivado en este dispositivo. Los avisos locales (🔔) van aparte.";
+    return;
+  }
+  if(esIOS()&&!esApp()){
+    info.innerHTML='<b class="wa">En iPhone el push requiere la app instalada:</b> Compartir → Añadir a pantalla de inicio → abrir desde el icono → 📲 otra vez. (iOS 16.4+)';
+    return; }
+  if(!("PushManager" in window)){ info.innerHTML='<span class="wa">Este navegador no soporta Web Push.</span>'; return; }
+  if(!PUSH.url){ const u=window.prompt("URL de tu push-server en Render (ver push-server/README-DEPLOY.md):","https://");
+    if(!u||u==="https://") return; PUSH.url=u.trim().replace(/\/+$/,""); localStorage.setItem("pushUrl",PUSH.url); }
+  if(!PUSH.token){ const k=window.prompt("ALERT_TOKEN (el mismo de las env vars de Render):","");
+    if(!k) return; PUSH.token=k.trim(); localStorage.setItem("pushToken",PUSH.token); }
+  let perm=Notification.permission;
+  if(perm==="default") perm=await Notification.requestPermission();
+  if(perm!=="granted"){ info.innerHTML='<span class="wa">Sin permiso de notificaciones no hay push.</span>'; return; }
+  if("serviceWorker" in navigator&&!SW_REG){ try{ SW_REG=await navigator.serviceWorker.register("./sw.js"); }catch(e){} }
+  if(!SW_REG){ info.innerHTML='<span class="wa">No se pudo registrar el service worker.</span>'; return; }
+  b.textContent="📲 …";
+  try{
+    const vk=await (await fetch(PUSH.url+"/vapid")).json();
+    if(!vk||!vk.key) throw new Error("el servidor no devolvió la llave VAPID");
+    const sub=await SW_REG.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(vk.key)});
+    const r=await fetch(PUSH.url+"/subscribe",{method:"POST",
+      headers:{"Content-Type":"application/json","x-token":PUSH.token},
+      body:JSON.stringify({sub,ua:navigator.userAgent.slice(0,80)})});
+    if(!r.ok) throw new Error("HTTP "+r.status+(r.status===401?" — token incorrecto":""));
+    PUSH.on=true; localStorage.setItem("pushOn","1");
+    b.textContent="📲 ON"; b.style.color="var(--ok)";
+    info.innerHTML='<b class="up">Push activo en este dispositivo (fase 2).</b> Las alertas que genere cualquier dispositivo tuyo con la app abierta — p. ej. la PC con 🔔 Vigilar — llegan aquí con la app cerrada.';
+  }catch(e){
+    b.textContent="📲"; b.style.color="";
+    info.innerHTML=`<span class="wa">Push falló: ${e.message}. ¿Desplegaste push-server (README-DEPLOY.md) y el token coincide?</span>`;
+  }
+}
+$("#ps").onclick=togglePush;
+if(PUSH.on){ const _pb=$("#ps"); if(_pb){ _pb.textContent="📲 ON"; _pb.style.color="var(--ok)"; } }
+
 // ═══════════ v2.5: RADAR DE WATCHLIST — ¿qué moneda tiene el mejor setup? ═══════════
 // Escaneo LIGERO bajo demanda (botón): velas 15m/1h/4h + ticker por moneda —
 // sin OI, sin L/S, sin libro (eso lo da el análisis completo al elegirla).
 // Puntúa el MISMO motor de siempre: detectarPatrones + calcularSesgo +
 // rankPatrones; "limpio" = todos los marcos del sesgo de acuerdo (+0.5).
 // Los precios usan precisión propia (el TICK global es de la moneda elegida).
-const RADAR={ts:null,rows:null};
+const RADAR={ts:null,rows:null,watch:false,timer:null};
 const fRad=x=>x==null||!isFinite(x)?"—":x>=1000?x.toFixed(1):x>=100?x.toFixed(2):x>=1?x.toFixed(3):x.toFixed(4);
-async function radarScan(){
+async function radarScan(auto){
   const btn=$("#rdBtn"), out=$("#rdOut");
-  btn.disabled=true; btn.textContent="📡 escaneando…";
-  out.innerHTML=`<div class="sub" style="margin-top:8px"><span class="spin"></span> ${MONEDAS.length} monedas · velas 15m/1h/4h…</div>`;
+  if(!auto){ btn.disabled=true; btn.textContent="📡 escaneando…";
+  out.innerHTML=`<div class="sub" style="margin-top:8px"><span class="spin"></span> ${MONEDAS.length} monedas · velas 15m/1h/4h…</div>`; }
   const rows=[];
   await Promise.all(MONEDAS.map(async m=>{
     try{
@@ -2645,7 +2729,8 @@ async function radarScan(){
   rows.sort((a,b)=>b.score-a.score);
   RADAR.ts=Date.now(); RADAR.rows=rows;
   pintarRadar();
-  btn.disabled=false; btn.textContent="📡 Escanear";
+  if(!auto){ btn.disabled=false; btn.textContent="📡 Escanear"; }
+  if(RADAR.watch) for(const a of alertasRadar()) notificar(a.titulo,a.cuerpo,a.tag);
 }
 function pintarRadar(){
   const out=$("#rdOut"); if(!RADAR.rows){ out.innerHTML=""; return; }
@@ -2682,7 +2767,94 @@ function pintarRadar(){
     window.scrollTo({top:0,behavior:"smooth"});
   });
 }
-$("#rdBtn").onclick=radarScan;
+$("#rdBtn").onclick=()=>radarScan(false);
+
+// ═══════════ v2.7: VIGÍA — alertas accionables por moneda+estilo ═══════════
+// Cada evento lleva su tag propio (moneda:estilo): un aviso de scalp no pisa
+// al de swing. Estado en localStorage: sobrevive recargas y no repite avisos.
+// El estado se actualiza SIEMPRE (aunque los avisos estén apagados) para no
+// disparar alertas viejas al encenderlos. El plan se rastrea desde que el
+// veredicto pasa a OPERAR — o desde que declaras POSICIÓN ABIERTA.
+const ALKEY="alertas:v1";
+function alGet(){ try{ const s=JSON.parse(localStorage.getItem(ALKEY)||"{}"); return s&&typeof s==="object"?s:{}; }catch(e){ return {}; } }
+function alSet(s){ try{ localStorage.setItem(ALKEY,JSON.stringify(s)); }catch(e){} }
+
+function evaluarAlertas(D, plan, G, SES, estilo, verd){
+  const S=alGet(), out=[], now=Date.now(), K=`${SYM}:${estilo}`;
+  // 1) cambio de sesgo de la moneda en pantalla
+  if(SES&&SES.grado!=="sin rumbo"){
+    const pv=S["ses:"+SYM];
+    if(pv&&pv.dir&&pv.dir!==SES.dir)
+      out.push({tag:`ses-${SYM}`,titulo:`${SYM} · CAMBIO DE SESGO`,
+        cuerpo:`${pv.eti||pv.dir} → ${SES.etiqueta} (fuerza ${SES.abs}/100). Lo que era a favor ahora es en contra: revisa plan y posición.`});
+    S["ses:"+SYM]={dir:SES.dir,eti:SES.etiqueta,ts:now};
+  }
+  // 2) armar/renovar el plan rastreado de esta moneda+estilo
+  const posTxt=(($("#pos")||{}).value||"").trim();
+  if(G&&plan&&plan.entry&&plan.tps&&plan.tps.length&&(verd==="OPERAR"||posTxt)){
+    const T=S["plan:"+K];
+    const tolC=(plan.atrAbs||0)*0.6 || plan.entry*0.004;
+    if(!T||T.dir!==G.d||Math.abs(T.entry-plan.entry)>tolC)
+      S["plan:"+K]={dir:G.d,entry:plan.entry,stop:plan.stop,tps:plan.tps.map(x=>x.px),hit:{},ts:now};
+  }
+  // 3) toques del plan rastreado: entrada · TP1/2/3 · stop (cada uno UNA vez)
+  const P=S["plan:"+K];
+  if(P&&D&&D.mark){
+    const sg=P.dir==="long"?1:-1, et=`${SYM} · ${estilo}`;
+    if(!P.hit.e&&Math.abs(D.mark-P.entry)<=P.entry*0.0015){ P.hit.e=1;
+      out.push({tag:`ent-${K}`,titulo:`${et} · precio EN TU ENTRADA ${f(P.entry)}`,
+        cuerpo:`mark ${f(D.mark)} · plan ${P.dir.toUpperCase()}. Confirma el cierre de la vela antes de ejecutar.`}); }
+    [0,1,2].forEach(i=>{ const px=P.tps[i], n=i+1;
+      if(px!=null&&!P.hit["t"+n]&&sg*(D.mark-px)>=0){ P.hit["t"+n]=1;
+        const acc=n===1?"cierra 40% y sube el stop a break-even":n===2?"cierra 35% — el runner queda al trailing":"zona del runner: lo cierra el trailing, no la mano";
+        out.push({tag:`tp${n}-${K}`,titulo:`${et} · TP${n} ALCANZADO ${f(px)}`,
+          cuerpo:`mark ${f(D.mark)}. ${acc}.`}); } });
+    if(!P.hit.s&&sg*(D.mark-P.stop)<=0){ P.hit.s=1;
+      out.push({tag:`stop-${K}`,titulo:`${et} · STOP tocado ${f(P.stop)}`,
+        cuerpo:`mark ${f(D.mark)}. Si estabas dentro: fuera con 1R. La operación siguiente a una pérdida es tu patrón más caro — deja pasar 20 min.`}); }
+    if(P.hit.s||P.hit.t3) delete S["plan:"+K]; else S["plan:"+K]=P;
+  }
+  alSet(S);
+  return out;
+}
+
+// avisos del radar: entrada candidata ≥7.5/10 + cambio de sesgo de TODA la watchlist
+function alertasRadar(){
+  const out=[]; if(!RADAR.rows) return out;
+  const S=alGet(), now=Date.now();
+  for(const r of RADAR.rows){
+    if(r.score<0) continue;
+    if(r.S&&r.S.grado!=="sin rumbo"){
+      const pv=S["ses:"+r.m];
+      if(pv&&pv.dir&&pv.dir!==r.S.dir)
+        out.push({tag:`ses-${r.m}`,titulo:`${r.m} · CAMBIO DE SESGO`,
+          cuerpo:`${pv.eti||pv.dir} → ${r.S.etiqueta} (fuerza ${r.S.abs}/100) — detectado por el radar.`});
+      S["ses:"+r.m]={dir:r.S.dir,eti:r.S.etiqueta,ts:now};
+    }
+    if(r.score>=7.5&&r.L){
+      const x=r.L.x, key=`rad:${r.m}:${x.tipo}:${x.estado}`;
+      if(!S[key]||now-S[key]>3*3600e3){ S[key]=now;
+        out.push({tag:`radar-${r.m}`,titulo:`📡 ${r.m} · ${r.score.toFixed(1)}/10 — no te la pierdas`,
+          cuerpo:`${x.tipo}${x.dir?` (${x.dir==="long"?"alcista":"bajista"})`:""} · ${r.L.tf} [${x.estado}]${x.gatillo?` · ${x.gatillo}`:""}${r.limpio?" · todos los marcos de acuerdo":""}. Ábrela y corre el análisis completo.`});
+      }
+    }
+  }
+  alSet(S);
+  return out;
+}
+function toggleRadarWatch(){
+  const b=$("#rdW");
+  RADAR.watch=!RADAR.watch;
+  clearInterval(RADAR.timer); RADAR.timer=null;
+  if(RADAR.watch){
+    b.textContent="🔔 Vigilando…"; b.style.color="var(--ok)";
+    if(!AVISOS&&!PUSH.on){ const info=$("#alinfo"); info.style.display="block";
+      info.innerHTML='Vigilancia del radar activada (escaneo cada 5 min). <span class="wa">Activa 🔔 (local) o 📲 (push) para que los avisos te LLEGUEN.</span>'; }
+    radarScan(true);
+    RADAR.timer=setInterval(()=>radarScan(true), 5*60e3);
+  } else { b.textContent="🔔 Vigilar"; b.style.color=""; }
+}
+$("#rdW").onclick=toggleRadarWatch;
 
 // ───────────────────────────── UI ─────────────────────────────
 // ═══════════ ESTADO DE SESIÓN — los gates que tus propios datos piden ═══════════

@@ -1,0 +1,9 @@
+{
+  "name": "wld-push-relay",
+  "version": "1.0.0",
+  "description": "Relay de notificaciones push para Perp WLD (fase 2): cualquier dispositivo con la app abierta genera alertas; todos los suscritos las reciben aunque la app este cerrada.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "express": "^4.19.2", "web-push": "^3.6.7" }
+}

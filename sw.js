@@ -12,3 +12,17 @@ self.addEventListener("notificationclick", e => {
     return clients.openWindow("./");
   }));
 });
+
+// ── fase 2: Web Push — el relay manda {t,b,tag}; esto lo muestra aunque la
+// app esté cerrada (iPhone instalado incluido) ──
+self.addEventListener("push", e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { b: e.data && e.data.text() }; }
+  e.waitUntil(self.registration.showNotification(d.t || "Perp WLD", {
+    body: d.b || "", tag: d.tag || "perp-push", renotify: true,
+    icon: "apple-touch-icon.png", badge: "apple-touch-icon.png"
+  }));
+});
+self.addEventListener("pushsubscriptionchange", e => {
+  // la app re-manda su suscripción al abrirse (self-heal); aquí no hay que hacer nada
+});
