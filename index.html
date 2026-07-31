@@ -207,8 +207,22 @@ function agrupa(v, ms){
 // llegue a ejecutarse.
 const MARGEN_MAX = 250, LEV_MAX_USR = 75;
 // Evento calendarizado (SKILL.md): sizing -50% en ventana, sin abrir +-30min
-const EVENTOS = {WLD:{n:"unlock WLD 24-jul 11:00 CST (baja de TASA -43%, NO cliff)",
-  ini:Date.UTC(2026,6,23,6), fin:Date.UTC(2026,6,26,6), ts:Date.UTC(2026,6,24,17)}};
+// ── EVENTOS CALENDARIZADOS ──
+// Vacío A PROPÓSITO, no por olvido. Verificado el 28-jul-2026 en la fuente primaria
+// (world.org) y en DefiLlama: WLD NO tiene unlocks de cliff. Los tokens se liberan
+// a diario de forma lineal, sin saltos. Lo del 24-jul-2026 no fue un unlock: fue una
+// BAJA del 43% en la TASA diaria de emisión (comunidad de 3.2M a 1.6M WLD/día,
+// equipo e inversores de 1.9M a 1.3M), y ya pasó. No hay ninguna otra fecha anunciada
+// hasta el tramo final, alrededor de julio de 2038.
+//
+// O sea: para WLD no existe una fecha que justifique recortar el tamaño. Dejar aquí
+// la ventana vieja era peor que dejarlo vacío — parecía cubierto y no cubría nada.
+//
+// El mecanismo SIGUE VIVO para lo que sí tiene fecha: dato macro, decisión de la Fed,
+// listado, hard fork. Para activarlo:
+//   WLD:{n:"qué es", ini:Date.UTC(a,m-1,d,h), fin:..., ts:momento exacto}
+// Dentro de [ini,fin] el tamaño se recorta a la mitad; a ±30 min de `ts` no se abre.
+const EVENTOS = {};
 const MONEDAS = ["WLD","BTC","ETH","SOL","FET","GMT","1000SHIB","1000FLOKI","GALA"];
 
 const $ = s => document.querySelector(s);
